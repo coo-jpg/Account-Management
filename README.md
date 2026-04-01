@@ -27,6 +27,10 @@ npm install
 npm run dev
 ```
 
+### Branding logo
+- Place your logo at `public/logo.png` (recommended transparent PNG).
+- The app now shows this logo on the login screen and top navigation bar, with a `BBCSS` fallback if the file is missing.
+
 ### Login Credentials
 | Username | Password | Role  |
 |----------|----------|-------|
