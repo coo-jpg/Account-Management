@@ -34,6 +34,7 @@ const DS = {
   invoiceDayDefault:1,defaultPaymentTerms:30,defaultBillingCycle:"Monthly",defaultHealth:"Green",defaultStatus:"Active",
   customFields:[],notesTemplate:"",showBranding:true,
   renewalStatuses:["Pending","In Discussion","Rate Revision","Renewed","Lost"],
+  branches:["Hyderabad","Bangalore"],
 };
 
 // ═══ UTILS ═══
@@ -130,8 +131,7 @@ export default function App(){
   const uS=async p=>{const u={...stg,...p};setStg(u);if(stgId)await patch("account_settings",`?id=eq.${stgId}`,{settings_data:u});tw("Saved")};
 
   // ─── ACCOUNT CRUD ───
-  const mkE=()=>({account_id:"",account_code:"",client:"",location:"",service_type:stg.serviceTypes[0]||"",contract_value:0,billing_cycle:stg.defaultBillingCycle,contract_start:"",contract_end:"",invoice_day:stg.invoiceDayDefault,payment_terms:stg.defaultPaymentTerms,status:stg.defaultStatus,health:stg.defaultHealth,staff_breakdown:Object.fromEntries(stg.staffRoles.map(r=>[r.key,{required:0,deployed:0}])),pending_amount:0,compliance_status:Object.fromEntries(stg.complianceItems.map(c=>[c.key,false])),contacts:[{name:"",phone:"",role:"POC"}],notes:stg.notesTemplate,renewal_status:stg.renewalStatuses?.[0]||"Pending",rate_revision:0,custom_data:{},_p:[],_d:[]});
-
+  const mkE=()=>({account_id:"",account_code:"",client:"",location:"",service_type:stg.serviceTypes[0]||"",contract_value:0,billing_cycle:stg.defaultBillingCycle,contract_start:"",contract_end:"",invoice_day:stg.invoiceDayDefault,payment_terms:stg.defaultPaymentTerms,status:stg.defaultStatus,health:stg.defaultHealth,staff_breakdown:Object.fromEntries(stg.staffRoles.map(r=>[r.key,{required:0,deployed:0}])),pending_amount:0,compliance_status:Object.fromEntries(stg.complianceItems.map(c=>[c.key,false])),contacts:[{name:"",phone:"",role:"POC"}],notes:stg.notesTemplate,renewal_status:stg.renewalStatuses?.[0]||"Pending",branch:stg.branches?.[0]||"",rate_revision:0,custom_data:{},_p:[],_d:[]});
   const saveAcc=async()=>{if(!fd)return;setSyncing(true);
     if(eMode){const{_p,_d,id,created_at,updated_at,...rest}=fd;await patch("accounts",`?id=eq.${fd.id}`,rest)}
     else{const nums=accs.map(a=>parseInt(a.account_id.replace("ACC-",""))||0);const nx=Math.max(0,...nums)+1;const{_p,_d,id,...rest}=fd;await post("accounts",{...rest,account_id:`ACC-${String(nx).padStart(3,"0")}`})}
@@ -151,7 +151,7 @@ export default function App(){
 
   // ─── DERIVED ───
   const sel=accs.find(a=>a.id===selId);
-  const fil=accs.filter(a=>{const mf=flt==="All"||a.health===flt||a.status===flt;const ms=a.client.toLowerCase().includes(srch.toLowerCase())||(a.location||"").toLowerCase().includes(srch.toLowerCase())||(a.account_code||"").toLowerCase().includes(srch.toLowerCase());return mf&&ms});
+  const fil=accs.filter(a=>{const mf=flt==="All"||a.health===flt||a.status===flt||a.branch===flt;const ms=a.client.toLowerCase().includes(srch.toLowerCase())||(a.location||"").toLowerCase().includes(srch.toLowerCase())||(a.account_code||"").toLowerCase().includes(srch.toLowerCase());return mf&&ms});
   const totCV=accs.reduce((s,a)=>s+Number(a.contract_value),0);
   const totP=accs.reduce((s,a)=>s+Number(a.pending_amount),0);
   const totR=accs.reduce((s,a)=>s+tS(a.staff_breakdown,"required"),0);
@@ -220,17 +220,18 @@ export default function App(){
     {(renS>0||cGap>0||ag.o9>0)&&<div style={{...sec,borderColor:"#7f5a08",marginBottom:16}}><div style={{...secT,color:C.yl,borderColor:"#7f5a08"}}>⚠ ALERTS</div>{renS>0&&<div style={{color:C.yl,fontSize:12,marginBottom:4}}>• {renS} contract(s) within {stg.alertThresholds.renewalDays}d</div>}{cGap>0&&<div style={{color:C.rd,fontSize:12,marginBottom:4}}>• {cGap} compliance gaps</div>}{ag.o9>0&&<div style={{color:C.rd,fontSize:12}}>• {$f(ag.o9,stg.currency)} overdue 90+d</div>}</div>}
     <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
       <input style={{...inp,width:200,flexShrink:0}} placeholder="Search client/code..." value={srch} onChange={e=>setSrch(e.target.value)}/>
-      {["All",...stg.healthStatuses.map(h=>h.key),...stg.accountStatuses].map(f=><button key={f} style={nb(flt===f)} onClick={()=>setFlt(f)}>{f}</button>)}
+      {["All",...stg.healthStatuses.map(h=>h.key),...stg.accountStatuses,...(stg.branches||[])].map(f=>
       <div style={{flex:1}}/>
       <button style={sb("s")} onClick={xCSV}>📥 CSV</button>
       <button style={sb("s")} onClick={loadAll}>🔄</button>
       {isA&&<button style={bt("p")} onClick={()=>{setFD(mkE());setEM(false);setSF(true)}}>+ NEW</button>}
     </div>
-    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{["Client","Code","Health","Contract","Staff","Pending","Renewal","Comp"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>
+    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{["Client","Code","Branch","Health","Contract","Staff","Pending","Renewal","Comp"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>
       {fil.map(a=>{const d=dTo(a.contract_end),sr=tS(a.staff_breakdown,"required"),sd=tS(a.staff_breakdown,"deployed"),ok=Object.values(a.compliance_status||{}).every(Boolean);
         return<tr key={a.id} style={{cursor:"pointer"}} onClick={()=>{setSelId(a.id);setView("detail")}} onMouseEnter={e=>e.currentTarget.style.background="#1a2418"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
           <td style={td}><div style={{fontWeight:700}}>{a.client}</div><div style={{fontSize:10,color:C.d}}>{a.account_id} · {a.location}</div></td>
           <td style={{...td,color:C.bl,fontWeight:600}}>{a.account_code||"—"}</td>
+          <td style={{...td,color:C.m,fontSize:11}}>{a.branch||"—"}</td>
           <td style={td}><span style={dot(hC(a.health,stg.healthStatuses))}/>{a.health}</td>
           <td style={{...td,color:C.g,fontWeight:600}}>{$f(Number(a.contract_value),stg.currency)}/yr</td>
           <td style={td}><span style={{color:sd<sr?C.yl:C.gn}}>{sd}</span><span style={{color:C.d}}>/{sr}</span></td>
@@ -309,7 +310,7 @@ export default function App(){
 
   // ═══ SETTINGS ═══
   const Stg=()=><div>
-    <div style={{display:"flex",gap:4,marginBottom:18,flexWrap:"wrap"}}>{[["general","General"],["services","Services"],["compliance","Compliance"],["health","Health"],["staff","Staff Roles"],["alerts","Alerts"],["billing","Billing"],["fields","Fields"],["data","Data"]].map(([k,l])=><button key={k} style={nb(sTab===k)} onClick={()=>setSTab(k)}>{l}</button>)}</div>
+    <div style={{display:"flex",gap:4,marginBottom:18,flexWrap:"wrap"}}>{[["general","General"],["services","Services"],["compliance","Compliance"],["health","Health"],["staff","Staff Roles"],["alerts","Alerts"],["billing","Billing"],["fields","Fields"],["branches","Branches"],["data","Data"]].map(([k,l])=><button key={k} style={nb(sTab===k)} onClick={()=>setSTab(k)}>{l}</button>)}</div>
     {sTab==="general"&&<div style={sec}><div style={secT}>BRANDING</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}><div><label style={lbl}>Company Name</label><input style={inp} value={stg.companyName} onChange={e=>uS({companyName:e.target.value})}/></div><div><label style={lbl}>Tagline</label><input style={inp} value={stg.tagline} onChange={e=>uS({tagline:e.target.value})}/></div><div><label style={lbl}>Currency</label><input style={{...inp,width:80}} value={stg.currency.symbol} onChange={e=>uS({currency:{...stg.currency,symbol:e.target.value}})}/></div><div><label style={lbl}>Locale</label><input style={inp} value={stg.currency.locale} onChange={e=>uS({currency:{...stg.currency,locale:e.target.value}})}/></div></div></div>}
     {sTab==="services"&&<div style={sec}><div style={secT}>SERVICE TYPES</div><div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>{stg.serviceTypes.map((t,i)=><div key={i} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#1a2418",border:`1px solid ${C.bd}`,padding:"4px 10px",fontSize:11}}><InEd value={t} onChange={v=>{const u=[...stg.serviceTypes];u[i]=v;uS({serviceTypes:u})}} style={{fontSize:11,color:C.t}}/><span style={{color:C.rd,cursor:"pointer",fontWeight:700}} onClick={()=>uS({serviceTypes:stg.serviceTypes.filter((_,j)=>j!==i)})}>×</span></div>)}</div><button style={sb("s")} onClick={()=>uS({serviceTypes:[...stg.serviceTypes,"New"]})}>+ ADD</button></div>}
     {sTab==="compliance"&&<div style={sec}><div style={secT}>COMPLIANCE ITEMS</div>{stg.complianceItems.map((item,i)=><div key={i} style={{display:"flex",gap:8,alignItems:"center",marginBottom:8}}><input style={{...inp,width:120}} value={item.key} onChange={e=>{const u=[...stg.complianceItems];u[i]={...u[i],key:e.target.value.replace(/\s/g,"")};uS({complianceItems:u})}}/><input style={{...inp,flex:1}} value={item.label} onChange={e=>{const u=[...stg.complianceItems];u[i]={...u[i],label:e.target.value};uS({complianceItems:u})}}/><span style={{color:C.rd,cursor:"pointer",fontWeight:700}} onClick={()=>uS({complianceItems:stg.complianceItems.filter((_,j)=>j!==i)})}>×</span></div>)}<button style={sb("s")} onClick={()=>uS({complianceItems:[...stg.complianceItems,{key:`c${Date.now()}`,label:"New"}]})}>+ ADD</button></div>}
@@ -318,6 +319,7 @@ export default function App(){
     {sTab==="alerts"&&<div style={sec}><div style={secT}>THRESHOLDS</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14}}><div><label style={lbl}>Renewal (days)</label><input style={inp} type="number" value={stg.alertThresholds.renewalDays} onChange={e=>uS({alertThresholds:{...stg.alertThresholds,renewalDays:Number(e.target.value)}})}/></div><div><label style={lbl}>Overdue (days)</label><input style={inp} type="number" value={stg.alertThresholds.overduePaymentDays} onChange={e=>uS({alertThresholds:{...stg.alertThresholds,overduePaymentDays:Number(e.target.value)}})}/></div><div><label style={lbl}>Staff %</label><input style={inp} type="number" value={stg.alertThresholds.staffShortfallPct} onChange={e=>uS({alertThresholds:{...stg.alertThresholds,staffShortfallPct:Number(e.target.value)}})}/></div></div></div>}
     {sTab==="billing"&&<div style={sec}><div style={secT}>DEFAULTS</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}><div><label style={lbl}>Invoice Day</label><input style={inp} type="number" min={1} max={28} value={stg.invoiceDayDefault} onChange={e=>uS({invoiceDayDefault:Number(e.target.value)})}/></div><div><label style={lbl}>Payment Terms</label><select style={inp} value={stg.defaultPaymentTerms} onChange={e=>uS({defaultPaymentTerms:Number(e.target.value)})}>{stg.paymentTermsPresets.map(d=><option key={d} value={d}>{d}d</option>)}</select></div></div></div>}
     {sTab==="fields"&&<div style={sec}><div style={secT}>CUSTOM FIELDS</div>{stg.customFields.map((f,i)=><div key={i} style={{display:"flex",gap:8,alignItems:"center",marginBottom:8}}><input style={{...inp,flex:1}} value={f.label} onChange={e=>{const u=[...stg.customFields];u[i]={...u[i],label:e.target.value};uS({customFields:u})}}/><select style={{...inp,width:100}} value={f.type} onChange={e=>{const u=[...stg.customFields];u[i]={...u[i],type:e.target.value};uS({customFields:u})}}><option value="text">Text</option><option value="number">Number</option><option value="toggle">Yes/No</option></select><span style={{color:C.rd,cursor:"pointer",fontWeight:700}} onClick={()=>uS({customFields:stg.customFields.filter((_,j)=>j!==i)})}>×</span></div>)}<button style={sb("s")} onClick={()=>uS({customFields:[...stg.customFields,{key:`cf_${Date.now()}`,label:"",type:"text"}]})}>+ ADD</button></div>}
+    {sTab==="branches"&&<div style={sec}><div style={secT}>BRANCHES</div><div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>{(stg.branches||[]).map((b,i)=><div key={i} style={{display:"inline-flex",alignItems:"center",gap:6,background:"#1a2418",border:`1px solid ${C.bd}`,padding:"4px 10px",fontSize:11}}><InEd value={b} onChange={v=>{const u=[...stg.branches];u[i]=v;uS({branches:u})}} style={{fontSize:11,color:C.t}}/><span style={{color:C.rd,cursor:"pointer",fontWeight:700}} onClick={()=>uS({branches:stg.branches.filter((_,j)=>j!==i)})}>×</span></div>)}</div><button style={sb("s")} onClick={()=>uS({branches:[...(stg.branches||[]),"New Branch"]})}>+ ADD</button></div>}
     {sTab==="data"&&<div style={sec}><div style={secT}>SUPABASE</div><div style={{fontSize:11,color:C.s,marginBottom:12}}>Connected: <span style={{color:C.g}}>iqccddabidfcrsbdehiq.supabase.co</span> · Mumbai</div><div style={{display:"flex",gap:8}}><button style={bt("s")} onClick={xCSV}>📥 CSV</button><button style={bt("s")} onClick={loadAll}>🔄 REFRESH</button></div></div>}
     <J3S/>
   </div>;
@@ -339,6 +341,7 @@ export default function App(){
         <div><label style={lbl}>Status</label><select style={inp} value={fd.status} onChange={e=>setFD({...fd,status:e.target.value})}>{stg.accountStatuses.map(s=><option key={s}>{s}</option>)}</select></div>
         <div><label style={lbl}>Health</label><select style={inp} value={fd.health} onChange={e=>setFD({...fd,health:e.target.value})}>{stg.healthStatuses.map(h=><option key={h.key} value={h.key}>{h.key}</option>)}</select></div>
         <div><label style={lbl}>Pending ({stg.currency.symbol})</label><input style={inp} type="number" value={fd.pending_amount} onChange={e=>setFD({...fd,pending_amount:Number(e.target.value)})}/></div>
+        <div><label style={lbl}>Branch</label><select style={inp} value={fd.branch||""} onChange={e=>setFD({...fd,branch:e.target.value})}>{(stg.branches||[]).map(b=><option key={b}>{b}</option>)}</select></div>
       </div>
       <div style={{marginTop:14}}><label style={{...lbl,marginBottom:8}}>👥 STAFF BREAKDOWN</label>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:8}}>
