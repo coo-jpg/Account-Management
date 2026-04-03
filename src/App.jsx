@@ -368,11 +368,11 @@ export default function App(){
       </div>
     </div>
     <div style={{padding:"18px 20px"}}>
-      {view==="dashboard"&&<Dash/>}
-      {view==="detail"&&<Det/>}
-      {view==="analytics"&&<Analytics/>}
-      {view==="users"&&isA&&<Usr/>}
-      {view==="settings"&&isA&&<Stg/>}
+     {view==="dashboard"&&Dash()}
+{view==="detail"&&Det()}
+{view==="analytics"&&Analytics()}
+{view==="users"&&isA&&Usr()}
+{view==="settings"&&isA&&Stg()}
     </div>
     {showFrm&&<Frm/>}
     {toast&&<div style={{position:"fixed",bottom:20,right:20,background:C.g,color:C.bg,padding:"8px 18px",fontSize:12,fontWeight:700,letterSpacing:1,fontFamily:F,zIndex:300,borderRadius:2}}>{toast}</div>}
