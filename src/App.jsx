@@ -374,7 +374,7 @@ export default function App(){
 {view==="users"&&isA&&Usr()}
 {view==="settings"&&isA&&Stg()}
     </div>
-    {showFrm&&<Frm/>}
+    {showFrm&&Frm()}
     {toast&&<div style={{position:"fixed",bottom:20,right:20,background:C.g,color:C.bg,padding:"8px 18px",fontSize:12,fontWeight:700,letterSpacing:1,fontFamily:F,zIndex:300,borderRadius:2}}>{toast}</div>}
   </div>;
 }
