@@ -354,6 +354,397 @@ export default function App(){
       <div style={{textAlign:"center",marginTop:14,fontSize:9,color:C.d,letterSpacing:2}}>BUILT FOR THE J3S OFFICE</div>
     </div></div>};
 
+  // ═══ COMMAND PANELS (4-Panel Dashboard) ═══
+  const CommandPanels=({accs,users,currentUser,isAdmin,stg,loadAll})=>{
+    // ── Supabase helpers for new tables ──
+    const cGet=async(t,p="")=>get(t,p);
+    const cPost=async(t,d)=>post(t,d);
+    const cPatch=async(t,m,d)=>patch(t,m,d);
+    const cRm=async(t,m)=>rm(t,m);
+    const daysSince=d=>{if(!d)return 0;return Math.floor((new Date()-new Date(d))/(864e5))};
+    const fDate=d=>d?new Date(d).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"2-digit"}):"—";
+    const fM=n=>n?`₹${Number(n).toLocaleString("en-IN")}`:"₹0";
+    const prC=p=>({critical:C.rd,high:"#e85a3a",normal:C.g,low:C.m}[p]||C.g);
+    const stC=s=>({pending:C.yl,in_progress:C.bl,completed:C.gn,overdue:C.rd,cancelled:C.m,partial:C.yl,collected:C.gn,disputed:C.rd,written_off:C.m,lead:"#6b7a5e",contacted:"#8a9a6e",proposal:C.g,negotiation:"#e8b84a",site_visit:"#4a9a4a",won:C.gn,lost:C.rd}[s]||C.g);
+    const pnl={background:C.p,border:`1px solid ${C.bd}`,overflow:"hidden",display:"flex",flexDirection:"column"};
+    const pnlH=(ac=C.g)=>({padding:"10px 14px",borderBottom:`1px solid ${C.bd}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:"linear-gradient(135deg,#111a0f 0%,#141e14 100%)"});
+    const pnlT=(ac=C.g)=>({fontSize:11,fontWeight:700,letterSpacing:2,color:ac,textTransform:"uppercase",fontFamily:F});
+    const sBt=(v="p",sm=false)=>({background:v==="p"?C.g:v==="d"?C.rd:"transparent",color:v==="p"?C.bg:v==="d"?"#fff":C.m,border:v==="g"?`1px solid ${C.bd}`:"none",padding:sm?"3px 8px":"5px 12px",fontSize:sm?9:10,fontFamily:F,fontWeight:700,letterSpacing:1,cursor:"pointer",textTransform:"uppercase",borderRadius:2});
+    const cInp={background:C.p,border:`1px solid ${C.bd}`,color:C.t,padding:"7px 10px",fontSize:11,fontFamily:F,borderRadius:2,width:"100%",boxSizing:"border-box"};
+    const cSel={...cInp,cursor:"pointer"};
+    const cBdg=c=>({display:"inline-block",padding:"1px 6px",fontSize:8,fontWeight:700,letterSpacing:1,borderRadius:2,background:`${c}22`,color:c,textTransform:"uppercase",fontFamily:F});
+    const cTag=(c=C.g)=>({display:"inline-flex",alignItems:"center",gap:4,padding:"2px 8px",fontSize:8,background:`${c}15`,color:c,borderRadius:2,fontFamily:F,letterSpacing:1,fontWeight:700});
+    const dBdg=(days,due)=>{const od=due&&new Date(due)<new Date();const c=od?C.rd:days>7?C.yl:days>3?C.g:C.gn;return{...cBdg(c),minWidth:36,textAlign:"center"}};
+    const mOv={position:"fixed",inset:0,background:"rgba(0,0,0,.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20};
+    const mBx={background:C.dk,border:`1px solid ${C.g}33`,padding:20,width:"100%",maxWidth:520,maxHeight:"85vh",overflowY:"auto",fontFamily:F};
+    const cLbl={fontSize:9,color:C.m,letterSpacing:1.5,marginBottom:3,textTransform:"uppercase",fontFamily:F};
+
+    // ═══ PANEL 1: ACCOUNT UPDATES ═══
+    function UpdPanel(){
+      const[items,setItems]=useState([]);const[showA,setShowA]=useState(false);const[ld,setLd]=useState(true);const[flt,setFlt]=useState("all");
+      const[fm,setFm]=useState({title:"",description:"",category:"general",priority:"normal",account_id:""});
+      const load=useCallback(async()=>{try{const d=await cGet("account_updates","?order=is_pinned.desc,created_at.desc&limit=50");setItems(d||[])}catch(e){}setLd(false)},[]);
+      useEffect(()=>{load()},[load]);
+      const add=async()=>{if(!fm.title.trim())return;const ac=accs.find(a=>a.id===fm.account_id);
+        await cPost("account_updates",{...fm,account_name:ac?.client||"",created_by_name:currentUser?.full_name||"Admin"});
+        setShowA(false);setFm({title:"",description:"",category:"general",priority:"normal",account_id:""});load()};
+      const pin=async u=>{await cPatch("account_updates",`?id=eq.${u.id}`,{is_pinned:!u.is_pinned});load()};
+      const del=async id=>{await cRm("account_updates",`?id=eq.${id}`);load()};
+      const cats=["all","general","contract","staff","billing","compliance","alert","renewal","onboarding"];
+      const catI={general:"📋",contract:"📄",staff:"👥",billing:"💰",compliance:"🛡",alert:"⚠",renewal:"🔄",onboarding:"🚀"};
+      const fl=flt==="all"?items:items.filter(u=>u.category===flt);
+      return<div style={pnl}>
+        <div style={pnlH()}><div style={pnlT()}>📋 ACCOUNT UPDATES</div><div style={{display:"flex",gap:6,alignItems:"center"}}><span style={{fontSize:9,color:C.m}}>{items.length}</span>{isAdmin&&<button style={sBt("p",true)} onClick={()=>setShowA(true)}>+ ADD</button>}</div></div>
+        <div style={{padding:"6px 10px",display:"flex",gap:3,flexWrap:"wrap",borderBottom:`1px solid ${C.bd}`}}>
+          {cats.map(c=><button key={c} onClick={()=>setFlt(c)} style={{...sBt("g",true),background:flt===c?C.g:"transparent",color:flt===c?C.bg:C.m,border:`1px solid ${flt===c?C.g:C.bd}`,padding:"2px 6px"}}>{c==="all"?"ALL":c.slice(0,4).toUpperCase()}</button>)}
+        </div>
+        <div style={{flex:1,overflowY:"auto",maxHeight:300}}>
+          {ld?<div style={{padding:20,textAlign:"center",color:C.m,fontSize:10}}>LOADING...</div>:
+          fl.length===0?<div style={{padding:20,textAlign:"center",color:C.m,fontSize:10}}>NO UPDATES</div>:
+          fl.map(u=><div key={u.id} style={{padding:"8px 12px",borderBottom:`1px solid #1a2418`,background:u.is_pinned?`${C.g}08`:"transparent",display:"flex",gap:8,alignItems:"flex-start"}}>
+            <div style={{fontSize:14,minWidth:18}}>{catI[u.category]||"📋"}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:"flex",gap:4,alignItems:"center",marginBottom:2,flexWrap:"wrap"}}>
+                {u.is_pinned&&<span style={{fontSize:8,color:C.g}}>📌</span>}
+                <span style={{fontSize:11,color:C.t,fontWeight:700}}>{u.title}</span>
+                <span style={cBdg(prC(u.priority))}>{u.priority}</span>
+              </div>
+              {u.description&&<div style={{fontSize:9,color:C.m,marginBottom:2}}>{u.description}</div>}
+              <div style={{display:"flex",gap:6,fontSize:8,color:C.d,flexWrap:"wrap"}}>
+                {u.account_name&&<span style={cTag()}>{u.account_name}</span>}
+                <span>{daysSince(u.created_at)}d ago · {u.created_by_name||"System"}</span>
+              </div>
+            </div>
+            {isAdmin&&<div style={{display:"flex",gap:2,flexShrink:0}}>
+              <button onClick={()=>pin(u)} style={{...sBt("g",true),fontSize:9,padding:"2px 4px"}}>{u.is_pinned?"📌":"📍"}</button>
+              <button onClick={()=>del(u.id)} style={{...sBt("g",true),fontSize:9,padding:"2px 4px",color:C.rd}}>✕</button>
+            </div>}
+          </div>)}
+        </div>
+        {showA&&<div style={mOv} onClick={()=>setShowA(false)}><div style={mBx} onClick={e=>e.stopPropagation()}>
+          <div style={{...pnlT(),marginBottom:14}}>NEW UPDATE</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div><div style={cLbl}>TITLE</div><input style={cInp} value={fm.title} onChange={e=>setFm({...fm,title:e.target.value})} placeholder="Update title..."/></div>
+            <div><div style={cLbl}>DESCRIPTION</div><textarea style={{...cInp,height:50,resize:"vertical"}} value={fm.description} onChange={e=>setFm({...fm,description:e.target.value})}/></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div><div style={cLbl}>CATEGORY</div><select style={cSel} value={fm.category} onChange={e=>setFm({...fm,category:e.target.value})}>{Object.keys(catI).map(c=><option key={c} value={c}>{c.toUpperCase()}</option>)}</select></div>
+              <div><div style={cLbl}>PRIORITY</div><select style={cSel} value={fm.priority} onChange={e=>setFm({...fm,priority:e.target.value})}>{["low","normal","high","critical"].map(p=><option key={p} value={p}>{p.toUpperCase()}</option>)}</select></div>
+            </div>
+            <div><div style={cLbl}>ACCOUNT</div><select style={cSel} value={fm.account_id} onChange={e=>setFm({...fm,account_id:e.target.value})}><option value="">— None —</option>{accs.map(a=><option key={a.id} value={a.id}>{a.client}</option>)}</select></div>
+            <div style={{display:"flex",gap:8,marginTop:6}}><button style={bt("p")} onClick={add}>CREATE</button><button style={bt("g")} onClick={()=>setShowA(false)}>CANCEL</button></div>
+          </div>
+        </div></div>}
+      </div>;
+    }
+
+    // ═══ PANEL 2: TO-DO TRACKER ═══
+    function TodoPanel(){
+      const[todos,setTodos]=useState([]);const[showA,setShowA]=useState(false);const[editI,setEditI]=useState(null);const[ld,setLd]=useState(true);const[sf,setSf]=useState("active");
+      const defF={title:"",description:"",priority:"normal",assigned_to_name:"",account_id:"",due_date:"",tags:""};
+      const[fm,setFm]=useState(defF);
+      const load=useCallback(async()=>{try{const d=await cGet("todos","?order=created_at.desc&limit=100");const now=new Date();
+        setTodos((d||[]).map(t=>(["pending","in_progress"].includes(t.status)&&t.due_date&&new Date(t.due_date)<now)?{...t,status:"overdue"}:t))}catch(e){}setLd(false)},[]);
+      useEffect(()=>{load()},[load]);
+      const save=async()=>{if(!fm.title.trim())return;const ac=accs.find(a=>a.id===fm.account_id);
+        const bd={title:fm.title,description:fm.description,priority:fm.priority,assigned_to_name:fm.assigned_to_name,account_id:fm.account_id||null,account_name:ac?.client||"",due_date:fm.due_date||null,tags:fm.tags?fm.tags.split(",").map(t=>t.trim()).filter(Boolean):[],assigned_by_name:currentUser?.full_name||"Admin"};
+        if(editI){bd.updated_at=new Date().toISOString();await cPatch("todos",`?id=eq.${editI.id}`,bd)}
+        else{bd.notified_at=new Date().toISOString();bd.status="pending";await cPost("todos",bd)}
+        setShowA(false);setEditI(null);setFm(defF);load()};
+      const upSt=async(id,s)=>{const bd={status:s,updated_at:new Date().toISOString()};if(s==="completed")bd.completed_at=new Date().toISOString();await cPatch("todos",`?id=eq.${id}`,bd);load()};
+      const del=async id=>{await cRm("todos",`?id=eq.${id}`);load()};
+      const fil=sf==="active"?todos.filter(t=>["pending","in_progress","overdue"].includes(t.status)):sf==="completed"?todos.filter(t=>t.status==="completed"):sf==="overdue"?todos.filter(t=>t.status==="overdue"):todos;
+      const st={t:todos.length,p:todos.filter(t=>t.status==="pending").length,o:todos.filter(t=>t.status==="overdue").length,c:todos.filter(t=>t.status==="completed").length};
+      return<div style={pnl}>
+        <div style={pnlH(C.bl)}><div style={pnlT(C.bl)}>📝 TO-DO TRACKER</div><div style={{display:"flex",gap:6,alignItems:"center"}}>
+          {st.o>0&&<span style={{...cBdg(C.rd),animation:"pulse 2s infinite"}}>{st.o} OVERDUE</span>}
+          <button style={sBt("p",true)} onClick={()=>{setEditI(null);setFm(defF);setShowA(true)}}>+ ADD</button>
+        </div></div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",borderBottom:`1px solid ${C.bd}`}}>
+          {[["ALL",st.t,C.t,"all"],["PENDING",st.p,C.yl,"active"],["OVERDUE",st.o,C.rd,"overdue"],["DONE",st.c,C.gn,"completed"]].map(([l,v,c,f])=>
+            <button key={f} onClick={()=>setSf(f)} style={{background:sf===f?`${c}11`:"transparent",border:"none",borderBottom:sf===f?`2px solid ${c}`:"2px solid transparent",padding:"6px 4px",cursor:"pointer",textAlign:"center"}}>
+              <div style={{fontSize:14,fontWeight:700,color:c,fontFamily:F}}>{v}</div><div style={{fontSize:7,color:C.m,letterSpacing:1,fontFamily:F}}>{l}</div>
+            </button>)}
+        </div>
+        <div style={{flex:1,overflowY:"auto",maxHeight:260}}>
+          {ld?<div style={{padding:20,textAlign:"center",color:C.m,fontSize:10}}>LOADING...</div>:
+          fil.length===0?<div style={{padding:20,textAlign:"center",color:C.m,fontSize:10}}>NO TASKS</div>:
+          fil.map(t=>{const days=daysSince(t.notified_at);const isOd=t.status==="overdue";
+            return<div key={t.id} style={{padding:"8px 12px",borderBottom:`1px solid #1a2418`,background:isOd?`${C.rd}08`:"transparent",display:"flex",gap:8,alignItems:"flex-start"}}>
+              <div onClick={()=>t.status!=="completed"?upSt(t.id,"completed"):upSt(t.id,"pending")} style={{width:14,height:14,borderRadius:2,border:`2px solid ${t.status==="completed"?C.gn:C.bd}`,background:t.status==="completed"?C.gn:"transparent",cursor:"pointer",flexShrink:0,marginTop:1,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:C.bg}}>{t.status==="completed"?"✓":""}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",gap:4,alignItems:"center",marginBottom:2,flexWrap:"wrap"}}>
+                  <span style={{fontSize:10,color:t.status==="completed"?C.m:C.t,fontWeight:700,textDecoration:t.status==="completed"?"line-through":"none"}}>{t.title}</span>
+                  <span style={cBdg(prC(t.priority))}>{t.priority}</span>
+                  <span style={cBdg(stC(t.status))}>{t.status.replace("_"," ")}</span>
+                </div>
+                <div style={{display:"flex",gap:4,fontSize:8,color:C.d,flexWrap:"wrap"}}>
+                  {t.assigned_to_name&&<span style={cTag(C.bl)}>→ {t.assigned_to_name}</span>}
+                  {t.account_name&&<span style={cTag()}>📁 {t.account_name}</span>}
+                  {t.due_date&&<span style={{color:isOd?C.rd:C.m}}>Due: {fDate(t.due_date)}</span>}
+                </div>
+              </div>
+              <div style={{textAlign:"center",flexShrink:0}}><div style={dBdg(days,t.due_date)}>{days}d</div><div style={{fontSize:6,color:C.d,marginTop:1}}>SINCE</div></div>
+              <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
+                {t.status==="pending"&&<button onClick={()=>upSt(t.id,"in_progress")} style={{...sBt("g",true),fontSize:7,padding:"1px 4px"}}>▶</button>}
+                <button onClick={()=>{setEditI(t);setFm({title:t.title,description:t.description||"",priority:t.priority,assigned_to_name:t.assigned_to_name||"",account_id:t.account_id||"",due_date:t.due_date||"",tags:(t.tags||[]).join(", ")});setShowA(true)}} style={{...sBt("g",true),fontSize:7,padding:"1px 4px"}}>✎</button>
+                <button onClick={()=>del(t.id)} style={{...sBt("g",true),fontSize:7,padding:"1px 4px",color:C.rd}}>✕</button>
+              </div>
+            </div>})}
+        </div>
+        {showA&&<div style={mOv} onClick={()=>{setShowA(false);setEditI(null)}}><div style={mBx} onClick={e=>e.stopPropagation()}>
+          <div style={{...pnlT(C.bl),marginBottom:14}}>{editI?"EDIT":"NEW"} TO-DO</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div><div style={cLbl}>TITLE *</div><input style={cInp} value={fm.title} onChange={e=>setFm({...fm,title:e.target.value})} placeholder="Task title..."/></div>
+            <div><div style={cLbl}>DESCRIPTION</div><textarea style={{...cInp,height:40,resize:"vertical"}} value={fm.description} onChange={e=>setFm({...fm,description:e.target.value})}/></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div><div style={cLbl}>PRIORITY</div><select style={cSel} value={fm.priority} onChange={e=>setFm({...fm,priority:e.target.value})}>{["low","normal","high","critical"].map(p=><option key={p} value={p}>{p.toUpperCase()}</option>)}</select></div>
+              <div><div style={cLbl}>DUE DATE</div><input type="date" style={cInp} value={fm.due_date} onChange={e=>setFm({...fm,due_date:e.target.value})}/></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div><div style={cLbl}>ASSIGN TO</div><select style={cSel} value={fm.assigned_to_name} onChange={e=>setFm({...fm,assigned_to_name:e.target.value})}><option value="">— Unassigned —</option>{users.map(u=><option key={u.id} value={u.full_name}>{u.full_name}</option>)}</select></div>
+              <div><div style={cLbl}>ACCOUNT</div><select style={cSel} value={fm.account_id} onChange={e=>setFm({...fm,account_id:e.target.value})}><option value="">— None —</option>{accs.map(a=><option key={a.id} value={a.id}>{a.client}</option>)}</select></div>
+            </div>
+            <div><div style={cLbl}>TAGS</div><input style={cInp} value={fm.tags} onChange={e=>setFm({...fm,tags:e.target.value})} placeholder="urgent, followup..."/></div>
+            <div style={{display:"flex",gap:8,marginTop:6}}><button style={bt("p")} onClick={save}>{editI?"UPDATE":"CREATE"}</button><button style={bt("g")} onClick={()=>{setShowA(false);setEditI(null)}}>CANCEL</button></div>
+          </div>
+        </div></div>}
+      </div>;
+    }
+
+    // ═══ PANEL 3: COLLECTIONS TRACKER ═══
+    function CollPanel(){
+      const[items,setItems]=useState([]);const[showA,setShowA]=useState(false);const[ld,setLd]=useState(true);const[mFlt,setMFlt]=useState("");
+      const defF={account_id:"",invoice_number:"",invoice_month:"",invoice_date:"",due_date:"",amount:"",gst_amount:"",notes:""};
+      const[fm,setFm]=useState(defF);
+      const load=useCallback(async()=>{try{const d=await cGet("collections","?order=due_date.desc&limit=200");const now=new Date();
+        setItems((d||[]).map(c=>(["pending","partial"].includes(c.status)&&c.due_date&&new Date(c.due_date)<now)?{...c,status:"overdue"}:c))}catch(e){}setLd(false)},[]);
+      useEffect(()=>{load()},[load]);
+      const add=async()=>{if(!fm.account_id||!fm.invoice_number||!fm.amount)return;const ac=accs.find(a=>a.id===fm.account_id);const amt=Number(fm.amount)||0;const gst=Number(fm.gst_amount)||0;
+        await cPost("collections",{...fm,account_name:ac?.client||"",amount:amt,gst_amount:gst,total_amount:amt+gst,collected_amount:0,status:"pending"});
+        setShowA(false);setFm(defF);load()};
+      const recPay=async(c,amount)=>{const nc=Number(c.collected_amount||0)+Number(amount);const ns=nc>=Number(c.total_amount)?"collected":"partial";
+        await cPatch("collections",`?id=eq.${c.id}`,{collected_amount:nc,status:ns,payment_date:new Date().toISOString().split("T")[0],followup_count:(c.followup_count||0)+1,updated_at:new Date().toISOString()});load()};
+      const tot=items.reduce((s,c)=>s+Number(c.total_amount||0),0);const col=items.reduce((s,c)=>s+Number(c.collected_amount||0),0);
+      const od=items.filter(c=>c.status==="overdue").reduce((s,c)=>s+(Number(c.total_amount)-Number(c.collected_amount||0)),0);
+      const pnd=tot-col;const rate=tot?Math.round((col/tot)*100):0;
+      const months=[...new Set(items.map(c=>c.invoice_month).filter(Boolean))].sort().reverse();
+      const fl=mFlt?items.filter(c=>c.invoice_month===mFlt):items;
+      return<div style={pnl}>
+        <div style={pnlH(C.gn)}><div style={pnlT(C.gn)}>💰 COLLECTIONS</div>{isAdmin&&<button style={sBt("p",true)} onClick={()=>setShowA(true)}>+ INVOICE</button>}</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",borderBottom:`1px solid ${C.bd}`,padding:"8px 10px",gap:4}}>
+          {[["INVOICED",fM(tot),C.t],["COLLECTED",fM(col),C.gn],["PENDING",fM(pnd),C.yl],["OVERDUE",fM(od),C.rd]].map(([l,v,c])=>
+            <div key={l} style={{textAlign:"center"}}><div style={{fontSize:11,fontWeight:700,color:c,fontFamily:F}}>{v}</div><div style={{fontSize:7,color:C.m,letterSpacing:1}}>{l}</div></div>)}
+        </div>
+        <div style={{padding:"5px 12px",borderBottom:`1px solid ${C.bd}`,display:"flex",alignItems:"center",gap:6}}>
+          <span style={{fontSize:9,color:C.m,minWidth:60}}>RATE</span>
+          <div style={{flex:1,height:6,background:C.bg,borderRadius:3,overflow:"hidden"}}><div style={{width:`${rate}%`,height:"100%",background:rate>80?C.gn:rate>50?C.yl:C.rd,borderRadius:3}}/></div>
+          <span style={{fontSize:10,fontWeight:700,color:rate>80?C.gn:rate>50?C.yl:C.rd,fontFamily:F}}>{rate}%</span>
+          <select style={{...cSel,width:"auto",padding:"2px 6px",fontSize:9}} value={mFlt} onChange={e=>setMFlt(e.target.value)}><option value="">ALL</option>{months.map(m=><option key={m} value={m}>{m}</option>)}</select>
+        </div>
+        <div style={{flex:1,overflowY:"auto",maxHeight:220}}>
+          {ld?<div style={{padding:20,textAlign:"center",color:C.m,fontSize:10}}>LOADING...</div>:
+          fl.length===0?<div style={{padding:20,textAlign:"center",color:C.m,fontSize:10}}>NO INVOICES</div>:
+          fl.map(c=>{const out=Number(c.total_amount)-Number(c.collected_amount||0);const pct=Number(c.total_amount)?Math.round((Number(c.collected_amount||0)/Number(c.total_amount))*100):0;const odD=c.status==="overdue"?daysSince(c.due_date):0;
+            return<div key={c.id} style={{padding:"8px 12px",borderBottom:`1px solid #1a2418`,background:c.status==="overdue"?`${C.rd}08`:"transparent"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                <div style={{display:"flex",gap:4,alignItems:"center"}}><span style={{fontSize:10,fontWeight:700,color:C.t}}>{c.invoice_number}</span><span style={cBdg(stC(c.status))}>{c.status}</span>{odD>0&&<span style={cBdg(C.rd)}>{odD}d OD</span>}</div>
+                <span style={{fontSize:11,fontWeight:700,color:C.g,fontFamily:F}}>{fM(c.total_amount)}</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><span style={{fontSize:9,color:C.m}}>{c.account_name} · {c.invoice_month}</span><span style={{fontSize:9,color:out>0?C.yl:C.gn}}>{out>0?`${fM(out)} due`:"PAID"}</span></div>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <div style={{flex:1,height:3,background:C.bg,borderRadius:2,overflow:"hidden"}}><div style={{width:`${pct}%`,height:"100%",background:pct===100?C.gn:C.g,borderRadius:2}}/></div>
+                <span style={{fontSize:8,color:C.m,fontFamily:F}}>{pct}%</span>
+                {out>0&&c.status!=="collected"&&isAdmin&&<button onClick={()=>{const amt=prompt(`Payment for ${c.invoice_number}\nOutstanding: ${fM(out)}`);if(amt&&Number(amt)>0)recPay(c,Number(amt))}} style={{...sBt("p",true),fontSize:7,padding:"1px 5px"}}>💵</button>}
+              </div>
+            </div>})}
+        </div>
+        {showA&&<div style={mOv} onClick={()=>setShowA(false)}><div style={mBx} onClick={e=>e.stopPropagation()}>
+          <div style={{...pnlT(C.gn),marginBottom:14}}>NEW INVOICE</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div><div style={cLbl}>ACCOUNT *</div><select style={cSel} value={fm.account_id} onChange={e=>setFm({...fm,account_id:e.target.value})}><option value="">Select...</option>{accs.map(a=><option key={a.id} value={a.id}>{a.client}</option>)}</select></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div><div style={cLbl}>INVOICE # *</div><input style={cInp} value={fm.invoice_number} onChange={e=>setFm({...fm,invoice_number:e.target.value})} placeholder="INV-001"/></div>
+              <div><div style={cLbl}>MONTH</div><input style={cInp} value={fm.invoice_month} onChange={e=>setFm({...fm,invoice_month:e.target.value})} placeholder="Apr 2026"/></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div><div style={cLbl}>INV DATE</div><input type="date" style={cInp} value={fm.invoice_date} onChange={e=>setFm({...fm,invoice_date:e.target.value})}/></div>
+              <div><div style={cLbl}>DUE DATE</div><input type="date" style={cInp} value={fm.due_date} onChange={e=>setFm({...fm,due_date:e.target.value})}/></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div><div style={cLbl}>AMOUNT ₹ *</div><input type="number" style={cInp} value={fm.amount} onChange={e=>setFm({...fm,amount:e.target.value})}/></div>
+              <div><div style={cLbl}>GST ₹</div><input type="number" style={cInp} value={fm.gst_amount} onChange={e=>setFm({...fm,gst_amount:e.target.value})}/></div>
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:6}}><button style={bt("p")} onClick={add}>CREATE</button><button style={bt("g")} onClick={()=>setShowA(false)}>CANCEL</button></div>
+          </div>
+        </div></div>}
+      </div>;
+    }
+
+    // ═══ PANEL 4: SALES PIPELINE ═══
+    function PipePanel(){
+      const[leads,setLeads]=useState([]);const[stages,setStages]=useState([]);const[tasks,setTasks]=useState([]);
+      const[showA,setShowA]=useState(false);const[showT,setShowT]=useState(null);const[editL,setEditL]=useState(null);
+      const[showCfg,setShowCfg]=useState(false);const[ld,setLd]=useState(true);const[vm,setVm]=useState("kanban");const[expL,setExpL]=useState(null);
+      const load=useCallback(async()=>{try{const[l,s,t]=await Promise.all([cGet("sales_pipeline","?order=created_at.desc&limit=200"),cGet("pipeline_stages","?order=sort_order.asc"),cGet("pipeline_tasks","?order=created_at.desc&limit=500")]);
+        setLeads(l||[]);setStages(s||[]);setTasks(t||[])}catch(e){}setLd(false)},[]);
+      useEffect(()=>{load()},[load]);
+      const defF={lead_name:"",company:"",contact_person:"",contact_phone:"",service_type:"",location:"",estimated_value:"",stage:"lead",assigned_to_name:"",expected_close_date:"",notes:""};
+      const[fm,setFm]=useState(defF);
+      const save=async()=>{if(!fm.lead_name.trim())return;const sg=stages.find(s=>s.slug===fm.stage);
+        const bd={...fm,estimated_value:Number(fm.estimated_value)||0,probability:sg?.probability||10,assigned_by_name:currentUser?.full_name||"Admin",expected_close_date:fm.expected_close_date||null};
+        if(editL){bd.updated_at=new Date().toISOString();await cPatch("sales_pipeline",`?id=eq.${editL.id}`,bd)}
+        else{bd.notified_at=new Date().toISOString();await cPost("sales_pipeline",bd)}
+        setShowA(false);setEditL(null);setFm(defF);load()};
+      const moveSt=async(id,ns)=>{const sg=stages.find(s=>s.slug===ns);const bd={stage:ns,probability:sg?.probability||10,updated_at:new Date().toISOString()};
+        if(ns==="won"||ns==="lost")bd.closed_at=new Date().toISOString();await cPatch("sales_pipeline",`?id=eq.${id}`,bd);load()};
+      const delL=async id=>{await cRm("sales_pipeline",`?id=eq.${id}`);load()};
+      const defTF={title:"",priority:"normal",assigned_to_name:"",due_date:""};const[tf,setTf]=useState(defTF);
+      const addT=async pid=>{if(!tf.title.trim())return;await cPost("pipeline_tasks",{...tf,pipeline_id:pid,status:"pending",assigned_by_name:currentUser?.full_name||"Admin",notified_at:new Date().toISOString(),due_date:tf.due_date||null});setTf(defTF);load()};
+      const upT=async(id,s)=>{const bd={status:s,updated_at:new Date().toISOString()};if(s==="completed")bd.completed_at=new Date().toISOString();await cPatch("pipeline_tasks",`?id=eq.${id}`,bd);load()};
+      const delT=async id=>{await cRm("pipeline_tasks",`?id=eq.${id}`);load()};
+      const[ns,setNs]=useState({name:"",color:"#d4a841",probability:50});
+      const addSt=async()=>{if(!ns.name.trim())return;const sl=ns.name.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"");const mx=stages.reduce((m,s)=>Math.max(m,s.sort_order||0),0);
+        await cPost("pipeline_stages",{...ns,slug:sl,sort_order:mx+1,is_active:true});setNs({name:"",color:"#d4a841",probability:50});load()};
+      const delSt=async id=>{await cRm("pipeline_stages",`?id=eq.${id}`);load()};
+      const tV=leads.reduce((s,l)=>s+Number(l.estimated_value||0),0);const wV=leads.reduce((s,l)=>s+(Number(l.estimated_value||0)*(l.probability||0)/100),0);
+      const wonV=leads.filter(l=>l.stage==="won").reduce((s,l)=>s+Number(l.estimated_value||0),0);const actC=leads.filter(l=>!["won","lost"].includes(l.stage)).length;
+      const actSt=stages.filter(s=>s.is_active);
+      return<div style={pnl}>
+        <div style={pnlH("#e8b84a")}><div style={pnlT("#e8b84a")}>🚀 SALES PIPELINE</div>
+          <div style={{display:"flex",gap:3,alignItems:"center"}}>
+            <button onClick={()=>setVm(v=>v==="kanban"?"list":"kanban")} style={sBt("g",true)}>{vm==="kanban"?"☰":"▦"}</button>
+            {isAdmin&&<button onClick={()=>setShowCfg(true)} style={sBt("g",true)}>⚙</button>}
+            <button style={sBt("p",true)} onClick={()=>{setEditL(null);setFm(defF);setShowA(true)}}>+ LEAD</button>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",borderBottom:`1px solid ${C.bd}`,padding:"6px 10px"}}>
+          {[["PIPELINE",fM(tV),C.t],["WEIGHTED",fM(wV),C.yl],["WON",fM(wonV),C.gn],["ACTIVE",actC,C.bl]].map(([l,v,c])=>
+            <div key={l} style={{textAlign:"center"}}><div style={{fontSize:10,fontWeight:700,color:c,fontFamily:F}}>{v}</div><div style={{fontSize:7,color:C.m,letterSpacing:1}}>{l}</div></div>)}
+        </div>
+        <div style={{flex:1,overflowX:"auto",overflowY:"auto",maxHeight:280}}>
+          {ld?<div style={{padding:20,textAlign:"center",color:C.m,fontSize:10}}>LOADING...</div>:
+          vm==="kanban"?<div style={{display:"flex",gap:2,padding:4,minWidth:actSt.length*150}}>
+            {actSt.map(sg=>{const sl=leads.filter(l=>l.stage===sg.slug);
+              return<div key={sg.id} style={{flex:1,minWidth:140,background:C.bg,overflow:"hidden"}}>
+                <div style={{padding:"5px 6px",background:`${sg.color}15`,borderBottom:`2px solid ${sg.color}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:7,fontWeight:700,color:sg.color,letterSpacing:1,fontFamily:F}}>{sg.name.toUpperCase()}</span>
+                  <span style={{...cBdg(sg.color),fontSize:7}}>{sl.length}</span>
+                </div>
+                <div style={{padding:3,display:"flex",flexDirection:"column",gap:2,maxHeight:220,overflowY:"auto"}}>
+                  {sl.map(l=>{const lt=tasks.filter(t=>t.pipeline_id===l.id);const days=daysSince(l.notified_at);
+                    return<div key={l.id} style={{background:C.p,padding:"5px 6px",border:`1px solid ${C.bd}`,cursor:"pointer"}} onClick={()=>setExpL(expL===l.id?null:l.id)}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:1}}><span style={{fontSize:9,fontWeight:700,color:C.t}}>{l.lead_name}</span><span style={dBdg(days)}>{days}d</span></div>
+                      {l.company&&<div style={{fontSize:7,color:C.m}}>{l.company}</div>}
+                      <div style={{fontSize:9,fontWeight:700,color:C.g,marginTop:1}}>{fM(l.estimated_value)}</div>
+                      {l.assigned_to_name&&<div style={{fontSize:7,color:C.bl}}>→ {l.assigned_to_name}</div>}
+                      {lt.length>0&&<div style={{fontSize:7,color:C.m,marginTop:2}}>📋 {lt.filter(t=>t.status==="completed").length}/{lt.length}</div>}
+                      {expL===l.id&&<div style={{marginTop:4,borderTop:`1px solid ${C.bd}`,paddingTop:4}} onClick={e=>e.stopPropagation()}>
+                        <div style={{display:"flex",gap:2,flexWrap:"wrap",marginBottom:3}}>
+                          {actSt.filter(s=>s.slug!==l.stage).map(s=><button key={s.slug} onClick={()=>moveSt(l.id,s.slug)} style={{...sBt("g",true),fontSize:6,padding:"1px 3px",color:s.color}}>{s.name.slice(0,6)}</button>)}
+                        </div>
+                        <div style={{display:"flex",gap:2}}>
+                          <button onClick={()=>{setEditL(l);setFm({lead_name:l.lead_name,company:l.company||"",contact_person:l.contact_person||"",contact_phone:l.contact_phone||"",service_type:l.service_type||"",location:l.location||"",estimated_value:l.estimated_value||"",stage:l.stage,assigned_to_name:l.assigned_to_name||"",expected_close_date:l.expected_close_date||"",notes:l.notes||""});setShowA(true)}} style={{...sBt("g",true),fontSize:6}}>✎</button>
+                          <button onClick={()=>setShowT(l.id)} style={{...sBt("g",true),fontSize:6,color:C.bl}}>📋</button>
+                          <button onClick={()=>delL(l.id)} style={{...sBt("g",true),fontSize:6,color:C.rd}}>✕</button>
+                        </div>
+                        {lt.map(t=><div key={t.id} style={{display:"flex",gap:3,alignItems:"center",padding:"1px 0",fontSize:7}}>
+                          <span onClick={()=>upT(t.id,t.status==="completed"?"pending":"completed")} style={{cursor:"pointer",color:t.status==="completed"?C.gn:C.m}}>{t.status==="completed"?"☑":"☐"}</span>
+                          <span style={{flex:1,color:t.status==="completed"?C.m:C.t,textDecoration:t.status==="completed"?"line-through":"none"}}>{t.title}</span>
+                          {t.notified_at&&<span style={dBdg(daysSince(t.notified_at),t.due_date)}>{daysSince(t.notified_at)}d</span>}
+                        </div>)}
+                      </div>}
+                    </div>})}
+                  {sl.length===0&&<div style={{textAlign:"center",padding:8,fontSize:7,color:C.d}}>—</div>}
+                </div>
+              </div>})}
+          </div>:
+          <div>{leads.map(l=>{const sg=stages.find(s=>s.slug===l.stage);const lt=tasks.filter(t=>t.pipeline_id===l.id);const days=daysSince(l.notified_at);
+            return<div key={l.id} style={{padding:"8px 12px",borderBottom:`1px solid #1a2418`,display:"flex",gap:8,alignItems:"center"}}>
+              <div style={{flex:1}}><div style={{display:"flex",gap:4,alignItems:"center",marginBottom:1}}><span style={{fontSize:10,fontWeight:700,color:C.t}}>{l.lead_name}</span><span style={cBdg(sg?.color||C.g)}>{sg?.name||l.stage}</span>{l.assigned_to_name&&<span style={cTag(C.bl)}>→ {l.assigned_to_name}</span>}</div>
+                <div style={{fontSize:8,color:C.m}}>{[l.company,l.service_type,l.location].filter(Boolean).join(" · ")}</div></div>
+              <div style={{textAlign:"right"}}><div style={{fontSize:11,fontWeight:700,color:C.g,fontFamily:F}}>{fM(l.estimated_value)}</div><div style={{display:"flex",gap:3,justifyContent:"flex-end"}}><span style={dBdg(days)}>{days}d</span>{lt.length>0&&<span style={{fontSize:7,color:C.m}}>📋{lt.filter(t=>t.status==="completed").length}/{lt.length}</span>}</div></div>
+              <div style={{display:"flex",gap:2}}>
+                <button onClick={()=>{setEditL(l);setFm({lead_name:l.lead_name,company:l.company||"",contact_person:l.contact_person||"",contact_phone:l.contact_phone||"",service_type:l.service_type||"",location:l.location||"",estimated_value:l.estimated_value||"",stage:l.stage,assigned_to_name:l.assigned_to_name||"",expected_close_date:l.expected_close_date||"",notes:l.notes||""});setShowA(true)}} style={sBt("g",true)}>✎</button>
+                <button onClick={()=>setShowT(l.id)} style={{...sBt("g",true),color:C.bl}}>📋</button>
+                <button onClick={()=>delL(l.id)} style={{...sBt("g",true),color:C.rd}}>✕</button>
+              </div>
+            </div>})}</div>}
+        </div>
+        {showA&&<div style={mOv} onClick={()=>{setShowA(false);setEditL(null)}}><div style={mBx} onClick={e=>e.stopPropagation()}>
+          <div style={{...pnlT("#e8b84a"),marginBottom:14}}>{editL?"EDIT":"NEW"} LEAD</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div><div style={cLbl}>NAME *</div><input style={cInp} value={fm.lead_name} onChange={e=>setFm({...fm,lead_name:e.target.value})}/></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div><div style={cLbl}>COMPANY</div><input style={cInp} value={fm.company} onChange={e=>setFm({...fm,company:e.target.value})}/></div>
+              <div><div style={cLbl}>SERVICE</div><input style={cInp} value={fm.service_type} onChange={e=>setFm({...fm,service_type:e.target.value})}/></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div><div style={cLbl}>CONTACT</div><input style={cInp} value={fm.contact_person} onChange={e=>setFm({...fm,contact_person:e.target.value})}/></div>
+              <div><div style={cLbl}>PHONE</div><input style={cInp} value={fm.contact_phone} onChange={e=>setFm({...fm,contact_phone:e.target.value})}/></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div><div style={cLbl}>LOCATION</div><input style={cInp} value={fm.location} onChange={e=>setFm({...fm,location:e.target.value})}/></div>
+              <div><div style={cLbl}>VALUE ₹</div><input type="number" style={cInp} value={fm.estimated_value} onChange={e=>setFm({...fm,estimated_value:e.target.value})}/></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div><div style={cLbl}>STAGE</div><select style={cSel} value={fm.stage} onChange={e=>setFm({...fm,stage:e.target.value})}>{actSt.map(s=><option key={s.slug} value={s.slug}>{s.name}</option>)}</select></div>
+              <div><div style={cLbl}>ASSIGN TO</div><select style={cSel} value={fm.assigned_to_name} onChange={e=>setFm({...fm,assigned_to_name:e.target.value})}><option value="">—</option>{users.map(u=><option key={u.id} value={u.full_name}>{u.full_name}</option>)}</select></div>
+            </div>
+            <div><div style={cLbl}>CLOSE DATE</div><input type="date" style={cInp} value={fm.expected_close_date} onChange={e=>setFm({...fm,expected_close_date:e.target.value})}/></div>
+            <div><div style={cLbl}>NOTES</div><textarea style={{...cInp,height:40,resize:"vertical"}} value={fm.notes} onChange={e=>setFm({...fm,notes:e.target.value})}/></div>
+            <div style={{display:"flex",gap:8,marginTop:6}}><button style={bt("p")} onClick={save}>{editL?"UPDATE":"CREATE"}</button><button style={bt("g")} onClick={()=>{setShowA(false);setEditL(null)}}>CANCEL</button></div>
+          </div>
+        </div></div>}
+        {showT&&<div style={mOv} onClick={()=>setShowT(null)}><div style={mBx} onClick={e=>e.stopPropagation()}>
+          <div style={{...pnlT(C.bl),marginBottom:10}}>PIPELINE TASKS</div>
+          {tasks.filter(t=>t.pipeline_id===showT).map(t=><div key={t.id} style={{display:"flex",gap:6,alignItems:"center",padding:"5px 0",borderBottom:`1px solid #1a2418`}}>
+            <span onClick={()=>upT(t.id,t.status==="completed"?"pending":"completed")} style={{cursor:"pointer",fontSize:14}}>{t.status==="completed"?"☑":"☐"}</span>
+            <div style={{flex:1}}><div style={{fontSize:10,color:t.status==="completed"?C.m:C.t,textDecoration:t.status==="completed"?"line-through":"none"}}>{t.title}</div>
+              <div style={{fontSize:8,color:C.d}}>{t.assigned_to_name&&`→ ${t.assigned_to_name}`}{t.due_date&&` · Due ${fDate(t.due_date)}`}{t.notified_at&&` · ${daysSince(t.notified_at)}d`}</div></div>
+            <span style={cBdg(prC(t.priority))}>{t.priority}</span>
+            <button onClick={()=>delT(t.id)} style={{...sBt("g",true),color:C.rd,fontSize:8}}>✕</button>
+          </div>)}
+          <div style={{borderTop:`1px solid ${C.bd}`,paddingTop:8,marginTop:8}}>
+            <div style={{...cLbl,marginBottom:4}}>ADD TASK</div>
+            <input style={{...cInp,marginBottom:6}} placeholder="Task..." value={tf.title} onChange={e=>setTf({...tf,title:e.target.value})}/>
+            <div style={{display:"flex",gap:4,marginBottom:6}}>
+              <select style={{...cSel,flex:1}} value={tf.priority} onChange={e=>setTf({...tf,priority:e.target.value})}>{["low","normal","high","critical"].map(p=><option key={p} value={p}>{p}</option>)}</select>
+              <select style={{...cSel,flex:1}} value={tf.assigned_to_name} onChange={e=>setTf({...tf,assigned_to_name:e.target.value})}><option value="">Assign...</option>{users.map(u=><option key={u.id} value={u.full_name}>{u.full_name}</option>)}</select>
+              <input type="date" style={{...cInp,flex:1}} value={tf.due_date} onChange={e=>setTf({...tf,due_date:e.target.value})}/>
+            </div>
+            <button style={bt("p")} onClick={()=>addT(showT)}>ADD</button>
+          </div>
+          <button style={{...bt("g"),marginTop:8,width:"100%"}} onClick={()=>setShowT(null)}>CLOSE</button>
+        </div></div>}
+        {showCfg&&<div style={mOv} onClick={()=>setShowCfg(false)}><div style={mBx} onClick={e=>e.stopPropagation()}>
+          <div style={{...pnlT("#e8b84a"),marginBottom:10}}>STAGES CONFIG</div>
+          {stages.map(s=><div key={s.id} style={{display:"flex",gap:6,alignItems:"center",padding:"4px 0",borderBottom:`1px solid #1a2418`}}>
+            <div style={{width:10,height:10,borderRadius:2,background:s.color}}/><span style={{flex:1,fontSize:10,color:C.t}}>{s.name}</span><span style={{fontSize:9,color:C.m}}>{s.probability}%</span>
+            {!["lead","won","lost"].includes(s.slug)&&<button onClick={()=>delSt(s.id)} style={{...sBt("g",true),color:C.rd,fontSize:8}}>✕</button>}
+          </div>)}
+          <div style={{borderTop:`1px solid ${C.bd}`,paddingTop:8,marginTop:8}}>
+            <div style={{...cLbl,marginBottom:4}}>ADD STAGE</div>
+            <div style={{display:"flex",gap:4}}>
+              <input style={{...cInp,flex:1}} placeholder="Name..." value={ns.name} onChange={e=>setNs({...ns,name:e.target.value})}/>
+              <input type="color" style={{width:32,height:28,padding:1,background:C.p,border:`1px solid ${C.bd}`,cursor:"pointer"}} value={ns.color} onChange={e=>setNs({...ns,color:e.target.value})}/>
+              <input type="number" style={{...cInp,width:44}} placeholder="%" value={ns.probability} onChange={e=>setNs({...ns,probability:Number(e.target.value)})}/>
+              <button style={sBt("p",true)} onClick={addSt}>ADD</button>
+            </div>
+          </div>
+          <button style={{...bt("g"),marginTop:8,width:"100%"}} onClick={()=>setShowCfg(false)}>CLOSE</button>
+        </div></div>}
+      </div>;
+    }
+
+    // ═══ RENDER 2x2 GRID ═══
+    return<>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,minHeight:"calc(100vh - 120px)"}}>
+        <UpdPanel/><TodoPanel/><CollPanel/><PipePanel/>
+      </div>
+      <J3S/>
+    </>;
+  };
+
   // ═══ MAIN RENDER ═══
   return<div style={{background:C.bg,minHeight:"100vh",fontFamily:F,color:C.t}}>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
@@ -362,7 +753,7 @@ export default function App(){
       <div><div style={{fontSize:16,fontWeight:700,color:C.g,letterSpacing:3}}>{stg.companyName} ACCOUNTS</div><div style={{fontSize:9,color:C.d,letterSpacing:2}}>BUILT FOR THE <span style={{color:C.g}}>J3S OFFICE</span></div></div>
       <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
         {syncing&&<span style={{fontSize:10,color:C.yl,animation:"pulse 1s infinite"}}>SYNCING</span>}
-        {[["dashboard","DASHBOARD"],["analytics","ANALYTICS"],...(isA?[["users","👤 USERS"],["settings","⚙ SETTINGS"]]:[])].map(([k,l])=><button key={k} style={nb(view===k||(view==="detail"&&k==="dashboard"))} onClick={()=>{setView(k);setSelId(null)}}>{l}</button>)}
+        {[["dashboard","DASHBOARD"],["command","COMMAND"],["analytics","ANALYTICS"],...(isA?[["users","👤 USERS"],["settings","⚙ SETTINGS"]]:[])].map(([k,l])=><button key={k} style={nb(view===k||(view==="detail"&&k==="dashboard"))} onClick={()=>{setView(k);setSelId(null)}}>{l}</button>)}
         <span style={{background:C.gn,color:C.bg,padding:"2px 8px",fontSize:9,fontWeight:700,borderRadius:2}}>LIVE</span>
         <div style={{display:"flex",alignItems:"center",gap:6,marginLeft:6,padding:"4px 10px",background:"#1a2418",border:`1px solid ${C.bd}`,fontSize:10}}>
           <span style={dot(C.gn)}/><span style={{color:C.t}}>{user.full_name||user.username}</span><span style={pill(isA?C.g:C.bl)}>{user.role.toUpperCase()}</span>
@@ -372,6 +763,7 @@ export default function App(){
     </div>
     <div style={{padding:"18px 20px"}}>
      {view==="dashboard"&&Dash()}
+{view==="command"&&<CommandPanels accs={accs} users={users} currentUser={user} isAdmin={isA} stg={stg} loadAll={loadAll}/>}
 {view==="detail"&&Det()}
 {view==="analytics"&&Analytics()}
 {view==="users"&&isA&&Usr()}
