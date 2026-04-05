@@ -441,7 +441,6 @@ export default function App(){
     function TodoPanel(){
       const[todos,setTodos]=useState([]);const[showA,setShowA]=useState(false);const[editI,setEditI]=useState(null);const[ld,setLd]=useState(true);const[sf,setSf]=useState("active");
       const defF={title:"",description:"",priority:"normal",assigned_to:"",assigned_to_name:"",account_id:"",due_date:"",tags:""};
-      const[fm,setFm]=useState(defF);
       const load=useCallback(async()=>{try{const d=await cGet("todos","?order=created_at.desc&limit=100");const now=new Date();
         setTodos((d||[]).map(t=>(["pending","in_progress"].includes(t.status)&&t.due_date&&new Date(t.due_date)<now)?{...t,status:"overdue"}:t))}catch(e){}setLd(false)},[]);
       useEffect(()=>{load()},[load]);
