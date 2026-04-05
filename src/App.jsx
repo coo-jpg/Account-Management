@@ -501,7 +501,7 @@ export default function App(){
               <div><div style={cLbl}>DUE DATE</div><input type="date" style={cInp} value={fm.due_date} onChange={e=>setFm({...fm,due_date:e.target.value})}/></div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              <div><div style={cLbl}>ASSIGN TO</div><select style={cSel} value={fm.assigned_to_name} onChange={e=>setFm({...fm,assigned_to_name:e.target.value})}><option value="">— Unassigned —</option>{users.map(u=><option key={u.id} value={u.full_name}>{u.full_name}</option>)}</select></div>
+              <div><div style={cLbl}>ASSIGN TO</div><select style={cSel} value={fm.assigned_to} onChange={e=>{const uid=e.target.value;const u=users.find(x=>x.id===uid);setFm({...fm,assigned_to:uid,assigned_to_name:u?(u.full_name||u.username):"All"})}}><option value="">— All (Everyone) —</option>{users.filter(u=>u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name||u.username}</option>)}</select></div>
               <div><div style={cLbl}>ACCOUNT</div><select style={cSel} value={fm.account_id} onChange={e=>setFm({...fm,account_id:e.target.value})}><option value="">— None —</option>{accs.map(a=><option key={a.id} value={a.id}>{a.client}</option>)}</select></div>
             </div>
             <div><div style={cLbl}>TAGS</div><input style={cInp} value={fm.tags} onChange={e=>setFm({...fm,tags:e.target.value})} placeholder="urgent, followup..."/></div>
