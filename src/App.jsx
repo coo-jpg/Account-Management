@@ -446,7 +446,7 @@ export default function App(){
         setTodos(visible.map(t=>(["pending","in_progress"].includes(t.status)&&t.due_date&&new Date(t.due_date)<now)?{...t,status:"overdue"}:t))}catch(e){}setLd(false)},[]);
       useEffect(()=>{load()},[load]);
       const save=async()=>{if(!fm.title.trim())return;const ac=accs.find(a=>a.id===fm.account_id);
-        const bd={title:fm.title,description:fm.description,priority:fm.priority,assigned_to_name:fm.assigned_to_name,account_id:fm.account_id||null,account_name:ac?.client||"",due_date:fm.due_date||null,tags:fm.tags?fm.tags.split(",").map(t=>t.trim()).filter(Boolean):[],assigned_by_name:currentUser?.full_name||"Admin"};
+        const bd={title:fm.title,description:fm.description,priority:fm.priority,assigned_to:fm.assigned_to||null,assigned_to_name:fm.assigned_to_name||"All",account_id:fm.account_id||null,account_name:ac?.client||"",due_date:fm.due_date||null,tags:fm.tags?fm.tags.split(",").map(t=>t.trim()).filter(Boolean):[],assigned_by:currentUser?.id||null,assigned_by_name:currentUser?.full_name||"Admin"};
         if(editI){bd.updated_at=new Date().toISOString();await cPatch("todos",`?id=eq.${editI.id}`,bd)}
         else{bd.notified_at=new Date().toISOString();bd.status="pending";await cPost("todos",bd)}
         setShowA(false);setEditI(null);setFm(defF);load()};
