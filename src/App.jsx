@@ -96,6 +96,8 @@ export default function App(){
   const[users,setUsers]=useState([]);
   const[showUF,setSUF]=useState(false);
   const[uf,setUF]=useState({username:"",password:"",full_name:"",role:"user"});
+  const[notifs,setNotifs]=useState([]);
+  const[notifTick,setNotifTick]=useState(0);
 
   const tw = m => {setToast(m);setTimeout(()=>setToast(null),2500)};
   const isA = user?.role==="admin";
@@ -125,7 +127,44 @@ export default function App(){
   },[]);
 
   const loadUsers=async()=>{const u=await get("acm_users","?order=created_at.asc");setUsers(u)};
-  useEffect(()=>{if(user){loadAll();if(user.role==="admin")loadUsers()}},[user,loadAll]);
+
+  // ─── NOTIFICATIONS ───
+  const loadNotifs=useCallback(async()=>{
+    if(!user?.id)return;
+    const n=await get("todo_notifications",`?recipient_id=eq.${user.id}&order=created_at.desc&limit=50`);
+    setNotifs(n||[]);
+  },[user?.id]);
+
+  useEffect(()=>{
+    if(user){
+      loadAll();
+      loadUsers();
+      loadNotifs();
+      // Run cleanup once per session
+      rpc("cleanup_old_todo_notifications",{}).catch(()=>{});
+      // Refresh notifications every 45 seconds
+      const iv=setInterval(()=>setNotifTick(t=>t+1),45000);
+      return ()=>clearInterval(iv);
+    }
+  },[user,loadAll,loadNotifs]);
+
+  useEffect(()=>{if(notifTick>0)loadNotifs()},[notifTick,loadNotifs]);
+
+  const markNotifRead=async(id)=>{
+    await patch("todo_notifications",`?id=eq.${id}`,{is_read:true});
+    setNotifs(prev=>prev.map(n=>n.id===id?{...n,is_read:true}:n));
+  };
+  const markAllNotifsRead=async()=>{
+    if(!user?.id)return;
+    await patch("todo_notifications",`?recipient_id=eq.${user.id}&is_read=eq.false`,{is_read:true});
+    setNotifs(prev=>prev.map(n=>({...n,is_read:true})));
+    tw("All marked as read");
+  };
+  const deleteNotif=async(id)=>{
+    await rm("todo_notifications",`?id=eq.${id}`);
+    setNotifs(prev=>prev.filter(n=>n.id!==id));
+  };
+  const unreadNotifCount=notifs.filter(n=>!n.is_read).length;
 
   // ─── SETTINGS ───
   const uS=async p=>{const u={...stg,...p};setStg(u);if(stgId)await patch("account_settings",`?id=eq.${stgId}`,{settings_data:u});tw("Saved")};
@@ -308,6 +347,43 @@ export default function App(){
     <J3S/>
   </div>;
 
+  // ═══ NOTIFICATIONS VIEW ═══
+  const Notif=()=>{
+    const fDateFull=d=>d?new Date(d).toLocaleString("en-IN",{day:"2-digit",month:"short",year:"2-digit",hour:"2-digit",minute:"2-digit"}):"—";
+    const evIcon={assigned:"📬",reassigned:"🔄",status_changed:"🔃",completed:"✅",deleted:"🗑️",remark_added:"💬"};
+    const evColor={assigned:C.bl,reassigned:C.yl,status_changed:C.bl,completed:C.gn,deleted:C.rd,remark_added:C.g};
+    return<div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
+        <div>
+          <div style={{fontSize:14,color:C.g,letterSpacing:2,fontWeight:700}}>🔔 NOTIFICATIONS</div>
+          <div style={{fontSize:10,color:C.m,marginTop:2}}>{unreadNotifCount} unread · {notifs.length} total · Auto-expires after 30/60 days</div>
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          <button style={sb("s")} onClick={loadNotifs}>🔄 REFRESH</button>
+          {unreadNotifCount>0&&<button style={bt("p")} onClick={markAllNotifsRead}>MARK ALL READ</button>}
+        </div>
+      </div>
+      {notifs.length===0?<div style={{...sec,textAlign:"center",padding:40,color:C.d,fontSize:12}}>No notifications yet. You'll be notified here when tasks are assigned to you, status changes, or remarks are added.</div>:
+      <div style={{background:C.p,border:`1px solid ${C.bd}`}}>
+        {notifs.map(n=><div key={n.id} style={{padding:"12px 16px",borderBottom:`1px solid #1a2418`,background:n.is_read?"transparent":`${C.g}08`,display:"flex",gap:12,alignItems:"flex-start",cursor:"pointer"}} onClick={()=>!n.is_read&&markNotifRead(n.id)}>
+          <div style={{fontSize:20,minWidth:24}}>{evIcon[n.event_type]||"🔔"}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:4,flexWrap:"wrap"}}>
+              {!n.is_read&&<span style={{width:8,height:8,borderRadius:"50%",background:C.g,display:"inline-block"}}/>}
+              <span style={{fontSize:12,color:C.t,fontWeight:700}}>{n.todo_title||"(Deleted task)"}</span>
+              <span style={pill(evColor[n.event_type]||C.m)}>{(n.event_type||"").replace("_"," ").toUpperCase()}</span>
+            </div>
+            <div style={{fontSize:11,color:C.s,marginBottom:4}}>{n.message}</div>
+            {n.remark&&<div style={{fontSize:11,color:C.g,fontStyle:"italic",marginBottom:4,padding:"6px 10px",background:C.bg,borderLeft:`2px solid ${C.g}`}}>💬 "{n.remark}"</div>}
+            <div style={{fontSize:10,color:C.d}}>{n.actor_name||"System"} · {fDateFull(n.created_at)}</div>
+          </div>
+          <button style={{...sb("s"),padding:"2px 6px",color:C.rd}} onClick={e=>{e.stopPropagation();deleteNotif(n.id)}}>✕</button>
+        </div>)}
+      </div>}
+      <J3S/>
+    </div>;
+  };
+
   // ═══ SETTINGS ═══
   const Stg=()=><div>
     <div style={{display:"flex",gap:4,marginBottom:18,flexWrap:"wrap"}}>{[["general","General"],["services","Services"],["compliance","Compliance"],["health","Health"],["staff","Staff Roles"],["alerts","Alerts"],["billing","Billing"],["fields","Fields"],["branches","Branches"],["data","Data"]].map(([k,l])=><button key={k} style={nb(sTab===k)} onClick={()=>setSTab(k)}>{l}</button>)}</div>
@@ -355,7 +431,7 @@ export default function App(){
     </div></div>};
 
   // ═══ COMMAND PANELS (4-Panel Dashboard) ═══
-  const CommandPanels=({accs,users,currentUser,isAdmin,stg,loadAll})=>{
+  const CommandPanels=({accs,users,currentUser,isAdmin,stg,loadAll,onNotifChange})=>{
     // ── Supabase helpers for new tables ──
     const cGet=async(t,p="")=>get(t,p);
     const cPost=async(t,d)=>post(t,d);
@@ -439,22 +515,90 @@ export default function App(){
 
     // ═══ PANEL 2: TO-DO TRACKER ═══
     function TodoPanel(){
-      const[todos,setTodos]=useState([]);const[showA,setShowA]=useState(false);const[editI,setEditI]=useState(null);const[ld,setLd]=useState(true);const[sf,setSf]=useState("active");
-      coconst defF={title:"",description:"",priority:"normal",assigned_to:"",assigned_to_name:"",account_id:"",due_date:"",tags:""};
+      const[todos,setTodos]=useState([]);
+      const[showA,setShowA]=useState(false);
+      const[editI,setEditI]=useState(null);
+      const[ld,setLd]=useState(true);
+      const[sf,setSf]=useState("active");
+      const[remarkModal,setRemarkModal]=useState(null);
+      const[remarkText,setRemarkText]=useState("");
+      const defF={title:"",description:"",priority:"normal",assigned_to:"",assigned_to_name:"",account_id:"",due_date:"",tags:""};
       const[fm,setFm]=useState(defF);
+
       const load=useCallback(async()=>{try{const d=await cGet("todos","?order=created_at.desc&limit=100");const now=new Date();
         const visible=(d||[]).filter(t=>isAdmin||t.assigned_to===null||t.assigned_to===currentUser?.id);
         setTodos(visible.map(t=>(["pending","in_progress"].includes(t.status)&&t.due_date&&new Date(t.due_date)<now)?{...t,status:"overdue"}:t))}catch(e){}setLd(false)},[]);
       useEffect(()=>{load()},[load]);
+
+      // ─── Notification helper ───
+      const notify=async(todo,eventType,message,remark)=>{
+        if(!todo)return;
+        const recipients=new Set();
+        if(todo.assigned_to)recipients.add(todo.assigned_to);
+        if(todo.assigned_by)recipients.add(todo.assigned_by);
+        (users||[]).filter(u=>u.role==="admin"&&u.is_active).forEach(u=>recipients.add(u.id));
+        if(currentUser?.id)recipients.delete(currentUser.id);
+        const rows=[...recipients].map(rid=>({recipient_id:rid,todo_id:todo.id,todo_title:todo.title,event_type:eventType,message,remark:remark||null,actor_id:currentUser?.id||null,actor_name:currentUser?.full_name||currentUser?.username||"System"}));
+        if(rows.length>0){await cPost("todo_notifications",rows);if(onNotifChange)onNotifChange();}
+      };
+
       const save=async()=>{if(!fm.title.trim())return;const ac=accs.find(a=>a.id===fm.account_id);
         const bd={title:fm.title,description:fm.description,priority:fm.priority,assigned_to:fm.assigned_to||null,assigned_to_name:fm.assigned_to_name||"All",account_id:fm.account_id||null,account_name:ac?.client||"",due_date:fm.due_date||null,tags:fm.tags?fm.tags.split(",").map(t=>t.trim()).filter(Boolean):[],assigned_by:currentUser?.id||null,assigned_by_name:currentUser?.full_name||"Admin"};
-        if(editI){bd.updated_at=new Date().toISOString();await cPatch("todos",`?id=eq.${editI.id}`,bd)}
-        else{bd.notified_at=new Date().toISOString();bd.status="pending";await cPost("todos",bd)}
+        if(editI){
+          bd.updated_at=new Date().toISOString();
+          const res=await cPatch("todos",`?id=eq.${editI.id}`,bd);
+          const updated=(res&&res[0])||{...editI,...bd};
+          if(editI.assigned_to!==bd.assigned_to){
+            await notify(updated,"reassigned",`Task reassigned to ${bd.assigned_to_name}`);
+          }
+        }else{
+          bd.notified_at=new Date().toISOString();bd.status="pending";
+          const res=await cPost("todos",bd);
+          const created=res&&res[0];
+          if(created)await notify(created,"assigned",`New task assigned: ${bd.title}`);
+        }
         setShowA(false);setEditI(null);setFm(defF);load()};
-      const upSt=async(id,s)=>{const bd={status:s,updated_at:new Date().toISOString()};if(s==="completed")bd.completed_at=new Date().toISOString();await cPatch("todos",`?id=eq.${id}`,bd);load()};
-      const del=async id=>{await cRm("todos",`?id=eq.${id}`);load()};
+
+      const upSt=async(id,s)=>{
+        const todo=todos.find(t=>t.id===id);
+        if(s==="completed"){
+          setRemarkModal({type:"complete",todo});
+          setRemarkText("");
+          return;
+        }
+        const bd={status:s,updated_at:new Date().toISOString()};
+        await cPatch("todos",`?id=eq.${id}`,bd);
+        if(todo)await notify(todo,"status_changed",`Status changed to ${s.replace("_"," ")}`);
+        load();
+      };
+
+      const confirmComplete=async()=>{
+        if(!remarkText.trim()){alert("Completion remark is required");return;}
+        const todo=remarkModal.todo;
+        const bd={status:"completed",completed_at:new Date().toISOString(),completion_remark:remarkText.trim(),updated_at:new Date().toISOString()};
+        await cPatch("todos",`?id=eq.${todo.id}`,bd);
+        await notify(todo,"completed",`Task completed: ${todo.title}`,remarkText.trim());
+        setRemarkModal(null);setRemarkText("");load();
+      };
+
+      const del=async(id)=>{
+        const todo=todos.find(t=>t.id===id);
+        setRemarkModal({type:"delete",todo});
+        setRemarkText("");
+      };
+
+      const confirmDelete=async()=>{
+        if(!remarkText.trim()){alert("Reason for deletion is required");return;}
+        const todo=remarkModal.todo;
+        // Send notification BEFORE deleting the todo
+        await notify(todo,"deleted",`Task deleted: ${todo.title}`,remarkText.trim());
+        await cRm("todos",`?id=eq.${todo.id}`);
+        setRemarkModal(null);setRemarkText("");load();
+      };
+
       const fil=sf==="active"?todos.filter(t=>["pending","in_progress","overdue"].includes(t.status)):sf==="completed"?todos.filter(t=>t.status==="completed"):sf==="overdue"?todos.filter(t=>t.status==="overdue"):todos;
       const st={t:todos.length,p:todos.filter(t=>t.status==="pending").length,o:todos.filter(t=>t.status==="overdue").length,c:todos.filter(t=>t.status==="completed").length};
+
       return<div style={pnl}>
         <div style={pnlH(C.bl)}><div style={pnlT(C.bl)}>📝 TO-DO TRACKER</div><div style={{display:"flex",gap:6,alignItems:"center"}}>
           {st.o>0&&<span style={{...cBdg(C.rd),animation:"pulse 2s infinite"}}>{st.o} OVERDUE</span>}
@@ -483,11 +627,12 @@ export default function App(){
                   {t.account_name&&<span style={cTag()}>📁 {t.account_name}</span>}
                   {t.due_date&&<span style={{color:isOd?C.rd:C.m}}>Due: {fDate(t.due_date)}</span>}
                 </div>
+                {t.completion_remark&&<div style={{fontSize:9,color:C.gn,fontStyle:"italic",marginTop:2}}>✓ {t.completion_remark}</div>}
               </div>
               <div style={{textAlign:"center",flexShrink:0}}><div style={dBdg(days,t.due_date)}>{days}d</div><div style={{fontSize:6,color:C.d,marginTop:1}}>SINCE</div></div>
               <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                 {t.status==="pending"&&<button onClick={()=>upSt(t.id,"in_progress")} style={{...sBt("g",true),fontSize:7,padding:"1px 4px"}}>▶</button>}
-              <button onClick={()=>{setEditI(t);setFm({title:t.title,description:t.description||"",priority:t.priority,assigned_to:t.assigned_to||"",assigned_to_name:t.assigned_to_name||"All",account_id:t.account_id||"",due_date:t.due_date||"",tags:(t.tags||[]).join(", ")});setShowA(true)}} style={{...sBt("g",true),fontSize:7,padding:"1px 4px"}}>✎</button>
+                <button onClick={()=>{setEditI(t);setFm({title:t.title,description:t.description||"",priority:t.priority,assigned_to:t.assigned_to||"",assigned_to_name:t.assigned_to_name||"All",account_id:t.account_id||"",due_date:t.due_date||"",tags:(t.tags||[]).join(", ")});setShowA(true)}} style={{...sBt("g",true),fontSize:7,padding:"1px 4px"}}>✎</button>
                 <button onClick={()=>del(t.id)} style={{...sBt("g",true),fontSize:7,padding:"1px 4px",color:C.rd}}>✕</button>
               </div>
             </div>})}
@@ -507,6 +652,23 @@ export default function App(){
             </div>
             <div><div style={cLbl}>TAGS</div><input style={cInp} value={fm.tags} onChange={e=>setFm({...fm,tags:e.target.value})} placeholder="urgent, followup..."/></div>
             <div style={{display:"flex",gap:8,marginTop:6}}><button style={bt("p")} onClick={save}>{editI?"UPDATE":"CREATE"}</button><button style={bt("g")} onClick={()=>{setShowA(false);setEditI(null)}}>CANCEL</button></div>
+          </div>
+        </div></div>}
+        {remarkModal&&<div style={mOv} onClick={()=>{setRemarkModal(null);setRemarkText("")}}><div style={mBx} onClick={e=>e.stopPropagation()}>
+          <div style={{...pnlT(remarkModal.type==="delete"?C.rd:C.gn),marginBottom:14}}>
+            {remarkModal.type==="delete"?"🗑 REASON FOR DELETION":"✅ COMPLETION REMARK"}
+          </div>
+          <div style={{fontSize:11,color:C.m,marginBottom:10}}>Task: <span style={{color:C.t,fontWeight:700}}>{remarkModal.todo?.title}</span></div>
+          <div style={{marginBottom:12}}>
+            <div style={cLbl}>{remarkModal.type==="delete"?"REASON *":"REMARK *"}</div>
+            <textarea style={{...cInp,height:80,resize:"vertical"}} value={remarkText} onChange={e=>setRemarkText(e.target.value)} placeholder={remarkModal.type==="delete"?"Why is this task being deleted?":"Describe the outcome or notes about this task..."} autoFocus/>
+          </div>
+          <div style={{fontSize:9,color:C.d,marginBottom:12}}>This action will notify the assignee, creator, and all admins.</div>
+          <div style={{display:"flex",gap:8}}>
+            <button style={remarkModal.type==="delete"?bt("d"):bt("p")} onClick={remarkModal.type==="delete"?confirmDelete:confirmComplete}>
+              {remarkModal.type==="delete"?"CONFIRM DELETE":"MARK COMPLETE"}
+            </button>
+            <button style={bt("g")} onClick={()=>{setRemarkModal(null);setRemarkText("")}}>CANCEL</button>
           </div>
         </div></div>}
       </div>;
@@ -754,19 +916,24 @@ export default function App(){
       <div><div style={{fontSize:16,fontWeight:700,color:C.g,letterSpacing:3}}>{stg.companyName} ACCOUNTS</div><div style={{fontSize:9,color:C.d,letterSpacing:2}}>BUILT FOR THE <span style={{color:C.g}}>J3S OFFICE</span></div></div>
       <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
         {syncing&&<span style={{fontSize:10,color:C.yl,animation:"pulse 1s infinite"}}>SYNCING</span>}
-        {[["dashboard","DASHBOARD"],["command","COMMAND"],["analytics","ANALYTICS"],...(isA?[["users","👤 USERS"],["settings","⚙ SETTINGS"]]:[])].map(([k,l])=><button key={k} style={nb(view===k||(view==="detail"&&k==="dashboard"))} onClick={()=>{setView(k);setSelId(null)}}>{l}</button>)}
+        {[["dashboard","DASHBOARD"],["command","COMMAND"],["analytics","ANALYTICS"],["notifications",`🔔 NOTIFICATIONS${unreadNotifCount>0?` (${unreadNotifCount})`:""}`],...(isA?[["users","👤 USERS"],["settings","⚙ SETTINGS"]]:[])].map(([k,l])=>{
+          const active=view===k||(view==="detail"&&k==="dashboard");
+          const hasUnread=k==="notifications"&&unreadNotifCount>0;
+          return<button key={k} style={{...nb(active),position:"relative",...(hasUnread&&!active?{borderColor:C.rd,color:C.rd}:{})}} onClick={()=>{setView(k);setSelId(null)}}>{l}</button>
+        })}
         <span style={{background:C.gn,color:C.bg,padding:"2px 8px",fontSize:9,fontWeight:700,borderRadius:2}}>LIVE</span>
         <div style={{display:"flex",alignItems:"center",gap:6,marginLeft:6,padding:"4px 10px",background:"#1a2418",border:`1px solid ${C.bd}`,fontSize:10}}>
           <span style={dot(C.gn)}/><span style={{color:C.t}}>{user.full_name||user.username}</span><span style={pill(isA?C.g:C.bl)}>{user.role.toUpperCase()}</span>
-          <span style={{color:C.rd,cursor:"pointer",fontWeight:700,marginLeft:4}} onClick={()=>{setUser(null);setLoaded(false);setAccs([]);setView("dashboard")}}>✕</span>
+          <span style={{color:C.rd,cursor:"pointer",fontWeight:700,marginLeft:4}} onClick={()=>{setUser(null);setLoaded(false);setAccs([]);setNotifs([]);setView("dashboard")}}>✕</span>
         </div>
       </div>
     </div>
     <div style={{padding:"18px 20px"}}>
      {view==="dashboard"&&Dash()}
-{view==="command"&&<CommandPanels accs={accs} users={users} currentUser={user} isAdmin={isA} stg={stg} loadAll={loadAll}/>}
+{view==="command"&&<CommandPanels accs={accs} users={users} currentUser={user} isAdmin={isA} stg={stg} loadAll={loadAll} onNotifChange={loadNotifs}/>}
 {view==="detail"&&Det()}
 {view==="analytics"&&Analytics()}
+{view==="notifications"&&Notif()}
 {view==="users"&&isA&&Usr()}
 {view==="settings"&&isA&&Stg()}
     </div>
