@@ -486,7 +486,7 @@ export default function App(){
               <div style={{textAlign:"center",flexShrink:0}}><div style={dBdg(days,t.due_date)}>{days}d</div><div style={{fontSize:6,color:C.d,marginTop:1}}>SINCE</div></div>
               <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                 {t.status==="pending"&&<button onClick={()=>upSt(t.id,"in_progress")} style={{...sBt("g",true),fontSize:7,padding:"1px 4px"}}>▶</button>}
-                <button onClick={()=>{setEditI(t);setFm({title:t.title,description:t.description||"",priority:t.priority,assigned_to_name:t.assigned_to_name||"",account_id:t.account_id||"",due_date:t.due_date||"",tags:(t.tags||[]).join(", ")});setShowA(true)}} style={{...sBt("g",true),fontSize:7,padding:"1px 4px"}}>✎</button>
+              <button onClick={()=>{setEditI(t);setFm({title:t.title,description:t.description||"",priority:t.priority,assigned_to:t.assigned_to||"",assigned_to_name:t.assigned_to_name||"All",account_id:t.account_id||"",due_date:t.due_date||"",tags:(t.tags||[]).join(", ")});setShowA(true)}} style={{...sBt("g",true),fontSize:7,padding:"1px 4px"}}>✎</button>
                 <button onClick={()=>del(t.id)} style={{...sBt("g",true),fontSize:7,padding:"1px 4px",color:C.rd}}>✕</button>
               </div>
             </div>})}
