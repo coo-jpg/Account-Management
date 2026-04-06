@@ -99,6 +99,18 @@ export default function App(){
   const[uf,setUF]=useState({username:"",password:"",full_name:"",role:"user",scope_level:"org",scope_branch:"",view_permissions:{dashboard:true,command:true,analytics:true,notifications:true}});
   const[notifs,setNotifs]=useState([]);
   const[notifTick,setNotifTick]=useState(0);
+  const[allTodos,setAllTodos]=useState([]);
+  const[allTaskUpdates,setAllTaskUpdates]=useState([]);
+  const[selTaskId,setSelTaskId]=useState(null);
+  const[taskFilter,setTaskFilter]=useState("active");
+  const[taskSearch,setTaskSearch]=useState("");
+  const[taskAssigneeFlt,setTaskAssigneeFlt]=useState("all");
+  const[showTaskForm,setShowTaskForm]=useState(false);
+  const[editTask,setEditTask]=useState(null);
+  const defTaskForm={title:"",description:"",priority:"normal",assigned_to:"",assigned_to_name:"",account_id:"",due_date:"",tags:""};
+  const[taskForm,setTaskForm]=useState(defTaskForm);
+  const[updateText,setUpdateText]=useState("");
+  const[updateStatus,setUpdateStatus]=useState("");
 
   const tw = m => {setToast(m);setTimeout(()=>setToast(null),2500)};
   const isA = user?.role==="admin";
@@ -108,7 +120,7 @@ export default function App(){
   const uBranch = user?.scope_branch||"";
   const vPerms = user?.view_permissions||{dashboard:true,command:true,analytics:true,notifications:true};
   const canSee = v => isA||vPerms[v]!==false;
-  const inScope = a => {if(isA||uScope==="org")return true;if(uScope==="branch")return a.state===uBranch;if(uScope==="site")return a.field_officer_id===user.id;return false};
+  const inScope = a => {if(isA||uScope==="org")return true;if(uScope==="branch")return a.branch===uBranch;if(uScope==="site")return a.field_officer_id===user.id;return false};
 
   // ─── AUTH via RPC (server-side bcrypt) ───
   const doLogin = async () => {
@@ -136,6 +148,18 @@ export default function App(){
 
   const loadUsers=async()=>{const u=await get("acm_users","?order=created_at.asc");setUsers(u)};
 
+  // ─── TASKS & UPDATES ───
+  const loadTasks=useCallback(async()=>{
+    const[t,u]=await Promise.all([
+      get("todos","?order=created_at.desc&limit=500"),
+      get("task_updates","?order=created_at.asc&limit=2000")
+    ]);
+    const now=new Date();
+    const processed=(t||[]).map(task=>(["pending","in_progress"].includes(task.status)&&task.due_date&&new Date(task.due_date)<now)?{...task,status:"overdue"}:task);
+    setAllTodos(processed);
+    setAllTaskUpdates(u||[]);
+  },[]);
+
   // ─── NOTIFICATIONS ───
   const loadNotifs=useCallback(async()=>{
     if(!user?.id)return;
@@ -148,13 +172,14 @@ export default function App(){
       loadAll();
       loadUsers();
       loadNotifs();
+      loadTasks();
       rpc("cleanup_old_todo_notifications",{}).catch(()=>{});
       const iv=setInterval(()=>setNotifTick(t=>t+1),45000);
       return ()=>clearInterval(iv);
     }
-  },[user,loadAll,loadNotifs]);
+  },[user,loadAll,loadNotifs,loadTasks]);
 
-  useEffect(()=>{if(notifTick>0)loadNotifs()},[notifTick,loadNotifs]);
+  useEffect(()=>{if(notifTick>0){loadNotifs();loadTasks()}},[notifTick,loadNotifs,loadTasks]);
 
   const markNotifRead=async(id)=>{
     await patch("todo_notifications",`?id=eq.${id}`,{is_read:true});
@@ -176,7 +201,7 @@ export default function App(){
   const uS=async p=>{const u={...stg,...p};setStg(u);if(stgId)await patch("account_settings",`?id=eq.${stgId}`,{settings_data:u});tw("Saved")};
 
   // ─── ACCOUNT CRUD ───
-  const mkE=()=>({account_id:"",account_code:"",client:"",location:"",service_type:stg.serviceTypes[0]||"",contract_value:0,billing_cycle:stg.defaultBillingCycle,contract_start:"",contract_end:"",invoice_day:stg.invoiceDayDefault,payment_terms:stg.defaultPaymentTerms,status:stg.defaultStatus,health:stg.defaultHealth,staff_breakdown:Object.fromEntries(stg.staffRoles.map(r=>[r.key,{required:0,deployed:0}])),pending_amount:0,compliance_status:Object.fromEntries(stg.complianceItems.map(c=>[c.key,false])),contacts:[{name:"",phone:"",role:"POC"}],notes:stg.notesTemplate,renewal_status:stg.renewalStatuses?.[0]||"Pending",state:"Telangana",rate_revision:0,field_officer_id:null,custom_data:{},_p:[],_d:[]});
+  const mkE=()=>({account_id:"",account_code:"",client:"",location:"",service_type:stg.serviceTypes[0]||"",contract_value:0,billing_cycle:stg.defaultBillingCycle,contract_start:"",contract_end:"",invoice_day:stg.invoiceDayDefault,payment_terms:stg.defaultPaymentTerms,status:stg.defaultStatus,health:stg.defaultHealth,staff_breakdown:Object.fromEntries(stg.staffRoles.map(r=>[r.key,{required:0,deployed:0}])),pending_amount:0,compliance_status:Object.fromEntries(stg.complianceItems.map(c=>[c.key,false])),contacts:[{name:"",phone:"",role:"POC"}],notes:stg.notesTemplate,renewal_status:stg.renewalStatuses?.[0]||"Pending",branch:stg.branches?.[0]||"",rate_revision:0,field_officer_id:null,custom_data:{},_p:[],_d:[]});
   const saveAcc=async()=>{if(!fd)return;setSyncing(true);
     if(eMode){const{_p,_d,id,created_at,updated_at,...rest}=fd;await patch("accounts",`?id=eq.${fd.id}`,rest)}
     else{const nums=accs.map(a=>parseInt(a.account_id.replace("ACC-",""))||0);const nx=Math.max(0,...nums)+1;const{_p,_d,id,...rest}=fd;await post("accounts",{...rest,account_id:`ACC-${String(nx).padStart(3,"0")}`})}
@@ -196,10 +221,90 @@ export default function App(){
   const updateUserField=async(id,data)=>{await patch("acm_users",`?id=eq.${id}`,data);await loadUsers();tw("Updated")};
   const vpToggle=async(u,key)=>{const vp={...(u.view_permissions||{dashboard:true,command:true,analytics:true,notifications:true})};vp[key]=!vp[key];await updateUserField(u.id,{view_permissions:vp})};
 
+  // ─── TASK CRUD ───
+  const notifyTaskEvent=async(task,eventType,message,remark)=>{
+    if(!task)return;
+    const recipients=new Set();
+    if(task.assigned_to)recipients.add(task.assigned_to);
+    if(task.assigned_by)recipients.add(task.assigned_by);
+    (users||[]).filter(u=>u.role==="admin"&&u.is_active).forEach(u=>recipients.add(u.id));
+    if(user?.id)recipients.delete(user.id);
+    const rows=[...recipients].map(rid=>({recipient_id:rid,todo_id:task.id,todo_title:task.title,event_type:eventType,message,remark:remark||null,actor_id:user?.id||null,actor_name:user?.full_name||user?.username||"System"}));
+    if(rows.length>0){await post("todo_notifications",rows);loadNotifs()}
+  };
+
+  const saveTask=async()=>{
+    if(!taskForm.title.trim()){tw("Title required");return}
+    const ac=accs.find(a=>a.id===taskForm.account_id);
+    const bd={title:taskForm.title,description:taskForm.description,priority:taskForm.priority,assigned_to:taskForm.assigned_to||null,assigned_to_name:taskForm.assigned_to_name||"All",account_id:taskForm.account_id||null,account_name:ac?.client||"",due_date:taskForm.due_date||null,tags:taskForm.tags?taskForm.tags.split(",").map(t=>t.trim()).filter(Boolean):[],assigned_by:user?.id||null,assigned_by_name:user?.full_name||"Admin"};
+    setSyncing(true);
+    if(editTask){
+      bd.updated_at=new Date().toISOString();
+      const res=await patch("todos",`?id=eq.${editTask.id}`,bd);
+      const updated=(res&&res[0])||{...editTask,...bd};
+      if(editTask.assigned_to!==bd.assigned_to)await notifyTaskEvent(updated,"reassigned",`Task reassigned to ${bd.assigned_to_name}`);
+    }else{
+      bd.notified_at=new Date().toISOString();
+      bd.status="pending";
+      const res=await post("todos",bd);
+      const created=res&&res[0];
+      if(created)await notifyTaskEvent(created,"assigned",`New task assigned: ${bd.title}`);
+    }
+    await loadTasks();
+    setShowTaskForm(false);setEditTask(null);setTaskForm(defTaskForm);
+    setSyncing(false);tw(editTask?"Updated":"Created");
+  };
+
+  const delTask=async(id)=>{
+    const task=allTodos.find(t=>t.id===id);
+    const reason=prompt("Reason for deletion (required):");
+    if(!reason||!reason.trim())return;
+    setSyncing(true);
+    if(task)await notifyTaskEvent(task,"deleted",`Task deleted: ${task.title}`,reason.trim());
+    await rm("todos",`?id=eq.${id}`);
+    await loadTasks();
+    if(selTaskId===id)setSelTaskId(null);
+    setSyncing(false);tw("Deleted");
+  };
+
+  const postTaskUpdate=async(taskId)=>{
+    if(!updateText.trim()){tw("Update text required");return}
+    const task=allTodos.find(t=>t.id===taskId);
+    if(!task)return;
+    setSyncing(true);
+    // Post the update entry
+    await post("task_updates",{
+      todo_id:taskId,
+      update_text:updateText.trim(),
+      status_change:updateStatus||null,
+      author_id:user?.id||null,
+      author_name:user?.full_name||user?.username||"Unknown"
+    });
+    // If status changed, update the todo
+    if(updateStatus&&updateStatus!==task.status){
+      const patchBody={status:updateStatus,updated_at:new Date().toISOString()};
+      if(updateStatus==="completed"){patchBody.completed_at=new Date().toISOString();patchBody.completion_remark=updateText.trim()}
+      await patch("todos",`?id=eq.${taskId}`,patchBody);
+      await notifyTaskEvent(task,"status_changed",`Status: ${task.status} → ${updateStatus}`,updateText.trim());
+    }else{
+      await notifyTaskEvent(task,"remark_added",`New update on: ${task.title}`,updateText.trim());
+    }
+    setUpdateText("");setUpdateStatus("");
+    await loadTasks();
+    setSyncing(false);tw("Update posted");
+  };
+
+  const delTaskUpdate=async(updateId)=>{
+    if(!confirm("Delete this update?"))return;
+    await rm("task_updates",`?id=eq.${updateId}`);
+    await loadTasks();
+    tw("Update removed");
+  };
+
   // ─── DERIVED (scoped) ───
   const scopedAccs=accs.filter(inScope);
   const sel=accs.find(a=>a.id===selId);
-  const fil=scopedAccs.filter(a=>{const mf=flt==="All"||a.health===flt||a.status===flt||a.state===flt;const ms=a.client.toLowerCase().includes(srch.toLowerCase())||(a.location||"").toLowerCase().includes(srch.toLowerCase())||(a.account_code||"").toLowerCase().includes(srch.toLowerCase());return mf&&ms});
+  const fil=scopedAccs.filter(a=>{const mf=flt==="All"||a.health===flt||a.status===flt||a.branch===flt;const ms=a.client.toLowerCase().includes(srch.toLowerCase())||(a.location||"").toLowerCase().includes(srch.toLowerCase())||(a.account_code||"").toLowerCase().includes(srch.toLowerCase());return mf&&ms});
   const totCV=scopedAccs.reduce((s,a)=>s+Number(a.contract_value),0);
   const totP=scopedAccs.reduce((s,a)=>s+Number(a.pending_amount),0);
   const totR=scopedAccs.reduce((s,a)=>s+tS(a.staff_breakdown,"required"),0);
@@ -272,25 +377,25 @@ export default function App(){
 
   // ═══ DASHBOARD ═══
   const Dash=()=><>
-    {uScope!=="org"&&!isA&&<div style={{background:"#1a2418",border:`1px solid ${C.bd}`,padding:"8px 14px",marginBottom:14,fontSize:11,color:C.g,letterSpacing:1}}>🔒 SCOPE: {uScope==="branch"?`STATE · ${uBranch||"—"}`:`FIELD OFFICER · ${user.full_name||user.username} · ${scopedAccs.length} assigned account(s)`}</div>}
+    {uScope!=="org"&&!isA&&<div style={{background:"#1a2418",border:`1px solid ${C.bd}`,padding:"8px 14px",marginBottom:14,fontSize:11,color:C.g,letterSpacing:1}}>🔒 SCOPE: {uScope==="branch"?`BRANCH · ${uBranch||"—"}`:`FIELD OFFICER · ${user.full_name||user.username} · ${scopedAccs.length} assigned account(s)`}</div>}
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(155px,1fr))",gap:14,marginBottom:20}}>
       {[{l:"Accounts",v:actA.length,s:`${scopedAccs.length} total`,c:C.g},{l:"Monthly",v:$f(totCV/12,stg.currency),s:`ACV ${$f(totCV,stg.currency)}`,c:C.g},{l:"Receivables",v:$f(totP,stg.currency),s:`${cR.toFixed(0)}% collected`,c:totP>0?C.yl:C.gn},{l:"Staff",v:`${totD}/${totR}`,s:totD<totR?`${totR-totD} short`:"Full",c:totD<totR?C.yl:C.gn},{l:"DSO",v:`${dso.toFixed(0)}d`,s:dso<45?"Healthy":"Review",c:dso<45?C.gn:C.yl}].map((x,i)=><div key={i} style={{background:C.p,border:`1px solid ${C.bd}`,padding:14}}><div style={{fontSize:10,color:C.m,letterSpacing:2,textTransform:"uppercase"}}>{x.l}</div><div style={{fontSize:24,fontWeight:700,color:x.c}}>{x.v}</div><div style={{fontSize:10,color:C.d,marginTop:2}}>{x.s}</div></div>)}
     </div>
     {(renS>0||cGap>0||ag.o9>0)&&<div style={{...sec,borderColor:"#7f5a08",marginBottom:16}}><div style={{...secT,color:C.yl,borderColor:"#7f5a08"}}>⚠ ALERTS</div>{renS>0&&<div style={{color:C.yl,fontSize:12,marginBottom:4}}>• {renS} contract(s) within {stg.alertThresholds.renewalDays}d</div>}{cGap>0&&<div style={{color:C.rd,fontSize:12,marginBottom:4}}>• {cGap} compliance gaps</div>}{ag.o9>0&&<div style={{color:C.rd,fontSize:12}}>• {$f(ag.o9,stg.currency)} overdue 90+d</div>}</div>}
     <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
       <input style={{...inp,width:200,flexShrink:0}} placeholder="Search client/code..." value={srch} onChange={e=>setSrch(e.target.value)}/>
-      {["All",...stg.healthStatuses.map(h=>h.key),...stg.accountStatuses,...[...new Set(accs.map(a=>a.state).filter(Boolean))]].map(f=><button key={f} style={nb(flt===f)} onClick={()=>setFlt(f)}>{f}</button>)}
+      {["All",...stg.healthStatuses.map(h=>h.key),...stg.accountStatuses,...(stg.branches||[])].map(f=><button key={f} style={nb(flt===f)} onClick={()=>setFlt(f)}>{f}</button>)}
       <div style={{flex:1}}/>
       <button style={sb("s")} onClick={xCSV}>📥 CSV</button>
       <button style={sb("s")} onClick={loadAll}>🔄</button>
       {isA&&<button style={bt("p")} onClick={()=>{setFD(mkE());setEM(false);setSF(true)}}>+ NEW</button>}
     </div>
-    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{["Client","Code","State","Field Officer","Health","Contract","Staff","Pending","Renewal","Comp"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>
+    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{["Client","Code","Branch","Field Officer","Health","Contract","Staff","Pending","Renewal","Comp"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>
       {fil.map(a=>{const d=dTo(a.contract_end),sr=tS(a.staff_breakdown,"required"),sd=tS(a.staff_breakdown,"deployed"),ok=Object.values(a.compliance_status||{}).every(Boolean);
         return<tr key={a.id} style={{cursor:"pointer"}} onClick={()=>{setSelId(a.id);setView("detail")}} onMouseEnter={e=>e.currentTarget.style.background="#1a2418"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
           <td style={td}><div style={{fontWeight:700}}>{a.client}</div><div style={{fontSize:10,color:C.d}}>{a.account_id} · {a.location}</div></td>
           <td style={{...td,color:C.bl,fontWeight:600}}>{a.account_code||"—"}</td>
-          <td style={{...td,color:C.m,fontSize:11}}>{a.state||"—"}</td>
+          <td style={{...td,color:C.m,fontSize:11}}>{a.branch||"—"}</td>
           <td style={{...td,fontSize:11}}>{a.field_officer_id?<span style={{color:C.g,fontWeight:600}}>👤 {foName(a.field_officer_id,users)}</span>:<span style={{color:C.d}}>—</span>}</td>
           <td style={td}><span style={dot(hC(a.health,stg.healthStatuses))}/>{a.health}</td>
           <td style={{...td,color:C.g,fontWeight:600}}>{$f(Number(a.contract_value),stg.currency)}/yr</td>
@@ -349,15 +454,16 @@ export default function App(){
 
   // ═══ USERS ═══
   const Usr=()=><div>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><div style={{fontSize:14,color:C.g,letterSpacing:2,fontWeight:700}}>USER MANAGEMENT</div><button style={bt("p")} onClick={()=>setSUF(true)}>+ NEW USER</button></div><div style={{fontSize:10,color:C.m,marginBottom:10,letterSpacing:1}}>SCOPE: <span style={{color:C.g}}>ORG</span> = all states · <span style={{color:C.bl}}>STATE</span> = one state only · <span style={{color:C.yl}}>SITE</span> = only accounts where they're the field officer</div>
-    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:1100}}><thead><tr>{["Username","Name","Role","Scope","State","Views","Active","Last Login","Actions"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><div style={{fontSize:14,color:C.g,letterSpacing:2,fontWeight:700}}>USER MANAGEMENT</div><button style={bt("p")} onClick={()=>setSUF(true)}>+ NEW USER</button></div>
+    <div style={{fontSize:10,color:C.m,marginBottom:10,letterSpacing:1}}>SCOPE: <span style={{color:C.g}}>ORG</span> = all branches · <span style={{color:C.bl}}>BRANCH</span> = one branch only · <span style={{color:C.yl}}>SITE</span> = only accounts where they're the field officer</div>
+    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:1100}}><thead><tr>{["Username","Name","Role","Scope","Branch","Views","Active","Last Login","Actions"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>
       {users.map(u=>{const vp=u.view_permissions||{dashboard:true,command:true,analytics:true,notifications:true};const isSelf=u.id===user.id;
         return<tr key={u.id}>
           <td style={td}><span style={{fontWeight:700}}>{u.username}</span></td>
           <td style={td}>{u.full_name||"—"}</td>
           <td style={td}><span style={pill(u.role==="admin"?C.g:C.bl)}>{u.role.toUpperCase()}</span></td>
-       <td style={td}>{isSelf?<span style={pill(C.g)}>{(u.scope_level||"org").toUpperCase()}</span>:<select style={{...inp,width:90,padding:"2px 6px",fontSize:10}} value={u.scope_level||"org"} onChange={e=>updateUserField(u.id,{scope_level:e.target.value,...(e.target.value!=="branch"?{scope_branch:null}:{})})}><option value="org">Org</option><option value="branch">State</option><option value="site">Site</option></select>}</td>
-          <td style={td}>{u.scope_level==="branch"?(isSelf?<span style={{color:C.t}}>{u.scope_branch||"—"}</span>:<select style={{...inp,width:130,padding:"2px 6px",fontSize:10}} value={u.scope_branch||""} onChange={e=>updateUserField(u.id,{scope_branch:e.target.value})}><option value="">—</option>{[...new Set(accs.map(a=>a.state).filter(Boolean))].map(b=><option key={b} value={b}>{b}</option>)}</select>):<span style={{color:C.d}}>—</span>}</td>
+          <td style={td}>{isSelf?<span style={pill(C.g)}>{(u.scope_level||"org").toUpperCase()}</span>:<select style={{...inp,width:90,padding:"2px 6px",fontSize:10}} value={u.scope_level||"org"} onChange={e=>updateUserField(u.id,{scope_level:e.target.value,...(e.target.value!=="branch"?{scope_branch:null}:{})})}><option value="org">Org</option><option value="branch">Branch</option><option value="site">Site</option></select>}</td>
+          <td style={td}>{u.scope_level==="branch"?(isSelf?<span style={{color:C.t}}>{u.scope_branch||"—"}</span>:<select style={{...inp,width:110,padding:"2px 6px",fontSize:10}} value={u.scope_branch||""} onChange={e=>updateUserField(u.id,{scope_branch:e.target.value})}><option value="">—</option>{(stg.branches||[]).map(b=><option key={b} value={b}>{b}</option>)}</select>):<span style={{color:C.d}}>—</span>}</td>
           <td style={td}>{u.role==="admin"?<span style={{color:C.d,fontSize:10}}>ALL (admin)</span>:<div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{[["dashboard","DASH"],["command","CMD"],["analytics","ANL"],["notifications","NOTIF"]].map(([k,l])=><label key={k} style={{display:"flex",alignItems:"center",gap:3,fontSize:9,cursor:isSelf?"default":"pointer",color:vp[k]?C.gn:C.d}}><input type="checkbox" checked={vp[k]!==false} disabled={isSelf} onChange={()=>vpToggle(u,k)} style={{margin:0,cursor:isSelf?"default":"pointer"}}/>{l}</label>)}</div>}</td>
           <td style={td}><span style={dot(u.is_active?C.gn:C.rd)}/>{u.is_active?"Active":"Off"}</td>
           <td style={{...td,fontSize:11,color:C.m}}>{u.last_login?$d(u.last_login):"Never"}</td>
@@ -371,8 +477,8 @@ export default function App(){
         <div style={{marginBottom:10}}><label style={lbl}>Password</label><input style={inp} type="password" value={uf.password} onChange={e=>setUF({...uf,password:e.target.value})}/></div>
         <div style={{marginBottom:10}}><label style={lbl}>Full Name</label><input style={inp} value={uf.full_name} onChange={e=>setUF({...uf,full_name:e.target.value})}/></div>
         <div style={{marginBottom:10}}><label style={lbl}>Role</label><select style={inp} value={uf.role} onChange={e=>setUF({...uf,role:e.target.value})}><option value="user">User</option><option value="admin">Admin</option></select></div>
-        <div style={{marginBottom:10}}><label style={lbl}>Scope Level</label><select style={inp} value={uf.scope_level} onChange={e=>setUF({...uf,scope_level:e.target.value,scope_branch:e.target.value==="branch"?uf.scope_branch:""})}><option value="org">Org (full company)</option><option value="branch">State (one state only)</option><option value="site">Site (assigned accounts only)</option></select></div>
-        {uf.scope_level==="branch"&&<div style={{marginBottom:10}}><label style={lbl}>State</label><select style={inp} value={uf.scope_branch} onChange={e=>setUF({...uf,scope_branch:e.target.value})}><option value="">Select...</option>{[...new Set(accs.map(a=>a.state).filter(Boolean))].map(b=><option key={b} value={b}>{b}</option>)}</select></div>}
+        <div style={{marginBottom:10}}><label style={lbl}>Scope Level</label><select style={inp} value={uf.scope_level} onChange={e=>setUF({...uf,scope_level:e.target.value,scope_branch:e.target.value==="branch"?uf.scope_branch:""})}><option value="org">Org (full company)</option><option value="branch">Branch (one branch only)</option><option value="site">Site (assigned accounts only)</option></select></div>
+        {uf.scope_level==="branch"&&<div style={{marginBottom:10}}><label style={lbl}>Branch</label><select style={inp} value={uf.scope_branch} onChange={e=>setUF({...uf,scope_branch:e.target.value})}><option value="">Select...</option>{(stg.branches||[]).map(b=><option key={b} value={b}>{b}</option>)}</select></div>}
         {uf.role!=="admin"&&<div style={{marginBottom:14}}><label style={lbl}>View Access</label><div style={{display:"flex",gap:10,flexWrap:"wrap",padding:"6px 0"}}>{[["dashboard","Dashboard"],["command","Command"],["analytics","Analytics"],["notifications","Notifications"]].map(([k,l])=><label key={k} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:uf.view_permissions[k]?C.t:C.m,cursor:"pointer"}}><input type="checkbox" checked={uf.view_permissions[k]} onChange={e=>setUF({...uf,view_permissions:{...uf.view_permissions,[k]:e.target.checked}})}/>{l}</label>)}</div></div>}
         <div style={{display:"flex",gap:8}}><button style={bt("p")} onClick={createUser}>CREATE</button><button style={bt("g")} onClick={()=>setSUF(false)}>CANCEL</button></div>
         <div style={{textAlign:"center",marginTop:14,fontSize:9,color:C.d,letterSpacing:2}}>BUILT FOR THE J3S OFFICE</div>
@@ -451,7 +557,7 @@ export default function App(){
         <div><label style={lbl}>Status</label><select style={inp} value={fd.status} onChange={e=>setFD({...fd,status:e.target.value})}>{stg.accountStatuses.map(s=><option key={s}>{s}</option>)}</select></div>
         <div><label style={lbl}>Health</label><select style={inp} value={fd.health} onChange={e=>setFD({...fd,health:e.target.value})}>{stg.healthStatuses.map(h=><option key={h.key} value={h.key}>{h.key}</option>)}</select></div>
         <div><label style={lbl}>Pending ({stg.currency.symbol})</label><input style={inp} type="number" value={fd.pending_amount} onChange={e=>setFD({...fd,pending_amount:Number(e.target.value)})}/></div>
-        <div><label style={lbl}>State</label><select style={inp} value={fd.state||""} onChange={e=>setFD({...fd,state:e.target.value})}><option value="">—</option>{[...new Set(accs.map(a=>a.state).filter(Boolean))].map(b=><option key={b}>{b}</option>)}<option value="Telangana">Telangana</option><option value="Karnataka">Karnataka</option><option value="Tamil Nadu">Tamil Nadu</option><option value="Kerala">Kerala</option><option value="Multi-State">Multi-State</option></select></div>
+        <div><label style={lbl}>Branch</label><select style={inp} value={fd.branch||""} onChange={e=>setFD({...fd,branch:e.target.value})}>{(stg.branches||[]).map(b=><option key={b}>{b}</option>)}</select></div>
         <div><label style={lbl}>Field Officer Responsible</label><select style={inp} value={fd.field_officer_id||""} onChange={e=>setFD({...fd,field_officer_id:e.target.value||null})}><option value="">— None —</option>{users.filter(u=>u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name||u.username} {u.scope_level==="site"?"(site)":u.scope_level==="branch"?`(${u.scope_branch||"branch"})`:""}</option>)}</select></div>
       </div>
       <div style={{marginTop:14}}><label style={{...lbl,marginBottom:8}}>👥 STAFF BREAKDOWN</label>
@@ -939,6 +1045,220 @@ export default function App(){
     </>;
   };
 
+  // ═══ TASKS VIEW (Full Tab) ═══
+  const Tasks=()=>{
+    // Filter visible tasks based on scope & role
+    const visibleTasks=allTodos.filter(t=>{
+      if(isA)return true;
+      // Non-admins see tasks assigned to them or unassigned
+      if(t.assigned_to===user.id||t.assigned_to===null)return true;
+      return false;
+    });
+
+    // Apply status filter
+    const statusFiltered=taskFilter==="all"?visibleTasks:
+      taskFilter==="active"?visibleTasks.filter(t=>["pending","in_progress","overdue"].includes(t.status)):
+      taskFilter==="overdue"?visibleTasks.filter(t=>t.status==="overdue"):
+      taskFilter==="completed"?visibleTasks.filter(t=>t.status==="completed"):
+      visibleTasks.filter(t=>t.status===taskFilter);
+
+    // Assignee filter
+    const assigneeFiltered=taskAssigneeFlt==="all"?statusFiltered:
+      taskAssigneeFlt==="me"?statusFiltered.filter(t=>t.assigned_to===user.id):
+      taskAssigneeFlt==="unassigned"?statusFiltered.filter(t=>!t.assigned_to):
+      statusFiltered.filter(t=>t.assigned_to===taskAssigneeFlt);
+
+    // Search filter
+    const filtered=!taskSearch?assigneeFiltered:assigneeFiltered.filter(t=>
+      t.title.toLowerCase().includes(taskSearch.toLowerCase())||
+      (t.description||"").toLowerCase().includes(taskSearch.toLowerCase())||
+      (t.account_name||"").toLowerCase().includes(taskSearch.toLowerCase())||
+      (t.assigned_to_name||"").toLowerCase().includes(taskSearch.toLowerCase())
+    );
+
+    // Stats
+    const st={
+      all:visibleTasks.length,
+      active:visibleTasks.filter(t=>["pending","in_progress","overdue"].includes(t.status)).length,
+      pending:visibleTasks.filter(t=>t.status==="pending").length,
+      in_progress:visibleTasks.filter(t=>t.status==="in_progress").length,
+      overdue:visibleTasks.filter(t=>t.status==="overdue").length,
+      completed:visibleTasks.filter(t=>t.status==="completed").length,
+    };
+
+    const prC=p=>({critical:C.rd,high:"#e85a3a",normal:C.g,low:C.m}[p]||C.g);
+    const stC=s=>({pending:C.yl,in_progress:C.bl,completed:C.gn,overdue:C.rd,cancelled:C.m}[s]||C.g);
+    const fmtTs=ts=>{if(!ts)return"—";const d=new Date(ts);return d.toLocaleString("en-IN",{day:"2-digit",month:"short",year:"2-digit",hour:"2-digit",minute:"2-digit"})};
+    const fmtDate=d=>{if(!d)return"—";return new Date(d).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"2-digit"})};
+    const daysSince=d=>{if(!d)return 0;return Math.floor((new Date()-new Date(d))/864e5)};
+
+    const selTask=selTaskId?allTodos.find(t=>t.id===selTaskId):null;
+    const selUpdates=selTask?allTaskUpdates.filter(u=>u.todo_id===selTask.id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)):[];
+    const canPostUpdate=selTask&&(isA||selTask.assigned_to===user.id||selTask.assigned_by===user.id);
+
+    return<div>
+      {/* Header + Stats */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
+        <div>
+          <div style={{fontSize:14,color:C.g,letterSpacing:2,fontWeight:700}}>📋 TASK TRACKER</div>
+          <div style={{fontSize:10,color:C.m,marginTop:2}}>{st.active} active · {st.overdue} overdue · {st.completed} completed · {st.all} total</div>
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          <button style={sb("s")} onClick={loadTasks}>🔄 REFRESH</button>
+          <button style={bt("p")} onClick={()=>{setEditTask(null);setTaskForm(defTaskForm);setShowTaskForm(true)}}>+ NEW TASK</button>
+        </div>
+      </div>
+
+      {/* Stat pills */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginBottom:14}}>
+        {[["ALL",st.all,C.t,"all"],["ACTIVE",st.active,C.yl,"active"],["PENDING",st.pending,C.yl,"pending"],["IN PROGRESS",st.in_progress,C.bl,"in_progress"],["OVERDUE",st.overdue,C.rd,"overdue"],["COMPLETED",st.completed,C.gn,"completed"]].map(([l,v,c,f])=>
+          <button key={f} onClick={()=>setTaskFilter(f)} style={{background:taskFilter===f?`${c}15`:C.p,border:`1px solid ${taskFilter===f?c:C.bd}`,padding:"10px 8px",cursor:"pointer",fontFamily:F,textAlign:"center"}}>
+            <div style={{fontSize:22,fontWeight:700,color:c}}>{v}</div>
+            <div style={{fontSize:9,color:C.m,letterSpacing:1.5,marginTop:2}}>{l}</div>
+          </button>)}
+      </div>
+
+      {/* Search + Assignee filter */}
+      <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+        <input style={{...inp,width:260,flexShrink:0}} placeholder="Search title / description / account..." value={taskSearch} onChange={e=>setTaskSearch(e.target.value)}/>
+        <select style={{...inp,width:180}} value={taskAssigneeFlt} onChange={e=>setTaskAssigneeFlt(e.target.value)}>
+          <option value="all">All assignees</option>
+          <option value="me">🎯 Assigned to me</option>
+          <option value="unassigned">Unassigned</option>
+          {users.filter(u=>u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name||u.username}</option>)}
+        </select>
+        <div style={{fontSize:10,color:C.m,marginLeft:6}}>{filtered.length} task(s)</div>
+      </div>
+
+      {/* Main layout: list | detail */}
+      <div style={{display:"grid",gridTemplateColumns:selTask?"minmax(320px,1fr) 2fr":"1fr",gap:14,alignItems:"flex-start"}}>
+
+        {/* Task list */}
+        <div style={{background:C.p,border:`1px solid ${C.bd}`,maxHeight:"calc(100vh - 320px)",overflowY:"auto"}}>
+          {filtered.length===0?<div style={{padding:40,textAlign:"center",color:C.d,fontSize:11}}>No tasks match the current filter</div>:
+          filtered.map(t=>{
+            const isSel=selTaskId===t.id;
+            const updCount=allTaskUpdates.filter(u=>u.todo_id===t.id).length;
+            const isOd=t.status==="overdue";
+            return<div key={t.id} onClick={()=>setSelTaskId(t.id===selTaskId?null:t.id)} style={{padding:"12px 14px",borderBottom:`1px solid #1a2418`,background:isSel?`${C.g}15`:isOd?`${C.rd}08`:"transparent",cursor:"pointer",borderLeft:isSel?`3px solid ${C.g}`:"3px solid transparent"}}>
+              <div style={{display:"flex",gap:6,alignItems:"flex-start",marginBottom:4}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,color:t.status==="completed"?C.m:C.t,fontWeight:700,textDecoration:t.status==="completed"?"line-through":"none",marginBottom:3}}>{t.title}</div>
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:4}}>
+                    <span style={pill(prC(t.priority))}>{t.priority}</span>
+                    <span style={pill(stC(t.status))}>{t.status.replace("_"," ")}</span>
+                    {updCount>0&&<span style={pill(C.bl)}>💬 {updCount}</span>}
+                  </div>
+                </div>
+              </div>
+              <div style={{fontSize:10,color:C.m,display:"flex",gap:6,flexWrap:"wrap"}}>
+                {t.assigned_to_name&&<span>→ {t.assigned_to_name}</span>}
+                {t.account_name&&<span>· 📁 {t.account_name}</span>}
+              </div>
+              {t.due_date&&<div style={{fontSize:10,color:isOd?C.rd:C.m,marginTop:3}}>Due: {fmtDate(t.due_date)}</div>}
+            </div>})}
+        </div>
+
+        {/* Task detail + updates */}
+        {selTask&&<div style={{background:C.p,border:`1px solid ${C.bd}`,maxHeight:"calc(100vh - 320px)",overflowY:"auto"}}>
+          <div style={{padding:"16px 18px",borderBottom:`1px solid ${C.bd}`,background:"linear-gradient(135deg,#111a0f 0%,#141e14 100%)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:8}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:16,fontWeight:700,color:C.t,marginBottom:4}}>{selTask.title}</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <span style={pill(prC(selTask.priority))}>{selTask.priority}</span>
+                  <span style={pill(stC(selTask.status))}>{selTask.status.replace("_"," ")}</span>
+                  {selTask.account_name&&<span style={pill(C.bl)}>📁 {selTask.account_name}</span>}
+                </div>
+              </div>
+              <div style={{display:"flex",gap:4}}>
+                {(isA||selTask.assigned_by===user.id)&&<button style={sb("s")} onClick={()=>{setEditTask(selTask);setTaskForm({title:selTask.title,description:selTask.description||"",priority:selTask.priority,assigned_to:selTask.assigned_to||"",assigned_to_name:selTask.assigned_to_name||"",account_id:selTask.account_id||"",due_date:selTask.due_date||"",tags:(selTask.tags||[]).join(", ")});setShowTaskForm(true)}}>✎ EDIT</button>}
+                {isA&&<button style={sb("d")} onClick={()=>delTask(selTask.id)}>✕ DELETE</button>}
+                <button style={sb("s")} onClick={()=>setSelTaskId(null)}>✕</button>
+              </div>
+            </div>
+            {selTask.description&&<div style={{fontSize:11,color:C.s,marginTop:8,lineHeight:1.5,whiteSpace:"pre-wrap"}}>{selTask.description}</div>}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginTop:12,fontSize:10}}>
+              <div><div style={{color:C.m,letterSpacing:1}}>ASSIGNED TO</div><div style={{color:C.t,fontWeight:700,marginTop:2}}>{selTask.assigned_to_name||"All"}</div></div>
+              <div><div style={{color:C.m,letterSpacing:1}}>ASSIGNED BY</div><div style={{color:C.t,fontWeight:700,marginTop:2}}>{selTask.assigned_by_name||"—"}</div></div>
+              <div><div style={{color:C.m,letterSpacing:1}}>DUE DATE</div><div style={{color:selTask.status==="overdue"?C.rd:C.t,fontWeight:700,marginTop:2}}>{fmtDate(selTask.due_date)}</div></div>
+              <div><div style={{color:C.m,letterSpacing:1}}>CREATED</div><div style={{color:C.t,fontWeight:700,marginTop:2}}>{daysSince(selTask.created_at)}d ago</div></div>
+            </div>
+            {selTask.tags&&selTask.tags.length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:10}}>{selTask.tags.map((tg,i)=><span key={i} style={{...pill(C.m),background:"#1a2418"}}>#{tg}</span>)}</div>}
+          </div>
+
+          {/* Activity Timeline */}
+          <div style={{padding:"16px 18px"}}>
+            <div style={{fontSize:11,color:C.g,letterSpacing:2,marginBottom:12,textTransform:"uppercase"}}>📜 Activity Log ({selUpdates.length})</div>
+
+            {selUpdates.length===0?<div style={{fontSize:11,color:C.d,fontStyle:"italic",marginBottom:14}}>No updates yet. {canPostUpdate?"Post the first update below.":""}</div>:
+            <div style={{marginBottom:14,position:"relative",paddingLeft:22}}>
+              <div style={{position:"absolute",left:7,top:6,bottom:6,width:2,background:C.bd}}/>
+              {selUpdates.map((u,i)=>{
+                const isStatusChange=!!u.status_change;
+                return<div key={u.id} style={{position:"relative",marginBottom:14,paddingBottom:8}}>
+                  <div style={{position:"absolute",left:-20,top:4,width:12,height:12,borderRadius:"50%",background:isStatusChange?stC(u.status_change):C.g,border:`2px solid ${C.bg}`}}/>
+                  <div style={{background:C.bg,padding:"10px 12px",border:`1px solid ${C.bd}`,borderLeft:`3px solid ${isStatusChange?stC(u.status_change):C.g}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:6}}>
+                      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                        <span style={{fontSize:11,color:C.g,fontWeight:700}}>👤 {u.author_name||"Unknown"}</span>
+                        {isStatusChange&&<span style={pill(stC(u.status_change))}>→ {u.status_change.replace("_"," ")}</span>}
+                      </div>
+                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                        <span style={{fontSize:9,color:C.d,fontFamily:F}}>{fmtTs(u.created_at)}</span>
+                        {(isA||u.author_id===user.id)&&<span style={{color:C.rd,cursor:"pointer",fontSize:11}} onClick={()=>delTaskUpdate(u.id)}>✕</span>}
+                      </div>
+                    </div>
+                    <div style={{fontSize:12,color:C.t,lineHeight:1.5,whiteSpace:"pre-wrap"}}>{u.update_text}</div>
+                  </div>
+                </div>})}
+            </div>}
+
+            {/* Post Update Composer */}
+            {canPostUpdate?<div style={{background:C.bg,border:`1px solid ${C.bd}`,padding:12}}>
+              <div style={{fontSize:10,color:C.g,letterSpacing:1.5,marginBottom:8}}>✍ ADD UPDATE</div>
+              <textarea style={{...inp,height:70,resize:"vertical",marginBottom:8}} placeholder="What progress have you made? What blockers? What's next?" value={updateText} onChange={e=>setUpdateText(e.target.value)}/>
+              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                <div style={{flex:1,minWidth:160}}>
+                  <label style={{...lbl,marginBottom:2}}>Change status? (optional)</label>
+                  <select style={inp} value={updateStatus} onChange={e=>setUpdateStatus(e.target.value)}>
+                    <option value="">— No change —</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+                <button style={{...bt("p"),marginTop:14}} onClick={()=>postTaskUpdate(selTask.id)} disabled={syncing||!updateText.trim()}>{syncing?"POSTING...":"POST UPDATE"}</button>
+              </div>
+            </div>:<div style={{fontSize:10,color:C.d,textAlign:"center",padding:10,fontStyle:"italic"}}>You can view this task but cannot post updates. Only the assignee, creator, or admins can add updates.</div>}
+          </div>
+        </div>}
+      </div>
+
+      {/* Task Form Modal */}
+      {showTaskForm&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:200,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:40,overflowY:"auto"}} onClick={()=>{setShowTaskForm(false);setEditTask(null)}}>
+        <div style={{background:C.dk,border:`2px solid ${C.g}`,padding:22,width:"94%",maxWidth:560,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+          <div style={{fontSize:14,fontWeight:700,color:C.g,letterSpacing:2,marginBottom:14}}>{editTask?"EDIT":"NEW"} TASK</div>
+          <div style={{marginBottom:10}}><label style={lbl}>Title *</label><input style={inp} value={taskForm.title} onChange={e=>setTaskForm({...taskForm,title:e.target.value})} placeholder="What needs to be done?"/></div>
+          <div style={{marginBottom:10}}><label style={lbl}>Description</label><textarea style={{...inp,height:70,resize:"vertical"}} value={taskForm.description} onChange={e=>setTaskForm({...taskForm,description:e.target.value})} placeholder="Details, context, expected outcome..."/></div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div><label style={lbl}>Priority</label><select style={inp} value={taskForm.priority} onChange={e=>setTaskForm({...taskForm,priority:e.target.value})}>{["low","normal","high","critical"].map(p=><option key={p} value={p}>{p.toUpperCase()}</option>)}</select></div>
+            <div><label style={lbl}>Due Date</label><input type="date" style={inp} value={taskForm.due_date} onChange={e=>setTaskForm({...taskForm,due_date:e.target.value})}/></div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div><label style={lbl}>Assign To</label><select style={inp} value={taskForm.assigned_to} onChange={e=>{const uid=e.target.value;const u=users.find(x=>x.id===uid);setTaskForm({...taskForm,assigned_to:uid,assigned_to_name:u?(u.full_name||u.username):"All"})}}><option value="">— All (Everyone) —</option>{users.filter(u=>u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name||u.username}</option>)}</select></div>
+            <div><label style={lbl}>Linked Account</label><select style={inp} value={taskForm.account_id} onChange={e=>setTaskForm({...taskForm,account_id:e.target.value})}><option value="">— None —</option>{scopedAccs.map(a=><option key={a.id} value={a.id}>{a.client}</option>)}</select></div>
+          </div>
+          <div style={{marginBottom:14}}><label style={lbl}>Tags (comma-separated)</label><input style={inp} value={taskForm.tags} onChange={e=>setTaskForm({...taskForm,tags:e.target.value})} placeholder="site-visit, urgent, vendor..."/></div>
+          <div style={{display:"flex",gap:8}}><button style={bt("p")} onClick={saveTask} disabled={syncing}>{syncing?"SAVING...":editTask?"UPDATE":"CREATE"}</button><button style={bt("g")} onClick={()=>{setShowTaskForm(false);setEditTask(null)}}>CANCEL</button></div>
+        </div>
+      </div>}
+
+      <J3S/>
+    </div>;
+  };
+
   // ═══ MAIN RENDER ═══
   return<div style={{background:C.bg,minHeight:"100vh",fontFamily:F,color:C.t}}>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
@@ -947,7 +1267,7 @@ export default function App(){
       <div><div style={{fontSize:16,fontWeight:700,color:C.g,letterSpacing:3}}>{stg.companyName} ACCOUNTS</div><div style={{fontSize:9,color:C.d,letterSpacing:2}}>BUILT FOR THE <span style={{color:C.g}}>J3S OFFICE</span></div></div>
       <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
         {syncing&&<span style={{fontSize:10,color:C.yl,animation:"pulse 1s infinite"}}>SYNCING</span>}
-        {[["dashboard","DASHBOARD"],["command","COMMAND"],["analytics","ANALYTICS"],["notifications",`🔔 NOTIFICATIONS${unreadNotifCount>0?` (${unreadNotifCount})`:""}`],...(isA?[["users","👤 USERS"],["settings","⚙ SETTINGS"]]:[])].filter(([k])=>["users","settings"].includes(k)?isA:canSee(k)).map(([k,l])=>{
+        {[["dashboard","DASHBOARD"],["tasks","📋 TASKS"],["command","COMMAND"],["analytics","ANALYTICS"],["notifications",`🔔 NOTIFICATIONS${unreadNotifCount>0?` (${unreadNotifCount})`:""}`],...(isA?[["users","👤 USERS"],["settings","⚙ SETTINGS"]]:[])].filter(([k])=>["users","settings"].includes(k)?isA:k==="tasks"?true:canSee(k)).map(([k,l])=>{
           const active=view===k||(view==="detail"&&k==="dashboard");
           const hasUnread=k==="notifications"&&unreadNotifCount>0;
           return<button key={k} style={{...nb(active),position:"relative",...(hasUnread&&!active?{borderColor:C.rd,color:C.rd}:{})}} onClick={()=>{setView(k);setSelId(null)}}>{l}</button>
@@ -961,6 +1281,7 @@ export default function App(){
     </div>
     <div style={{padding:"18px 20px"}}>
      {view==="dashboard"&&Dash()}
+{view==="tasks"&&Tasks()}
 {view==="command"&&<CommandPanels accs={scopedAccs} users={users} currentUser={user} isAdmin={isA} stg={stg} loadAll={loadAll} onNotifChange={loadNotifs}/>}
 {view==="detail"&&Det()}
 {view==="analytics"&&Analytics()}
