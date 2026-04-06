@@ -349,9 +349,8 @@ export default function App(){
 
   // ═══ USERS ═══
   const Usr=()=><div>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><div style={{fontSize:14,color:C.g,letterSpacing:2,fontWeight:700}}>USER MANAGEMENT</div><button style={bt("p")} onClick={()=>setSUF(true)}>+ NEW USER</button></div>
-    <div style={{fontSize:10,color:C.m,marginBottom:10,letterSpacing:1}}>SCOPE: <span style={{color:C.g}}>ORG</span> = all branches · <span style={{color:C.bl}}>BRANCH</span> = one branch only · <span style={{color:C.yl}}>SITE</span> = only accounts where they're the field officer</div>
-    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:1100}}><thead><tr>{["Username","Name","Role","Scope","Branch","Views","Active","Last Login","Actions"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><div style={{fontSize:14,color:C.g,letterSpacing:2,fontWeight:700}}>USER MANAGEMENT</div><button style={bt("p")} onClick={()=>setSUF(true)}>+ NEW USER</button></div><div style={{fontSize:10,color:C.m,marginBottom:10,letterSpacing:1}}>SCOPE: <span style={{color:C.g}}>ORG</span> = all states · <span style={{color:C.bl}}>STATE</span> = one state only · <span style={{color:C.yl}}>SITE</span> = only accounts where they're the field officer</div>
+    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:1100}}><thead><tr>{["Username","Name","Role","Scope","State","Views","Active","Last Login","Actions"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>
       {users.map(u=>{const vp=u.view_permissions||{dashboard:true,command:true,analytics:true,notifications:true};const isSelf=u.id===user.id;
         return<tr key={u.id}>
           <td style={td}><span style={{fontWeight:700}}>{u.username}</span></td>
