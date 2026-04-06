@@ -290,7 +290,7 @@ export default function App(){
         return<tr key={a.id} style={{cursor:"pointer"}} onClick={()=>{setSelId(a.id);setView("detail")}} onMouseEnter={e=>e.currentTarget.style.background="#1a2418"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
           <td style={td}><div style={{fontWeight:700}}>{a.client}</div><div style={{fontSize:10,color:C.d}}>{a.account_id} · {a.location}</div></td>
           <td style={{...td,color:C.bl,fontWeight:600}}>{a.account_code||"—"}</td>
-          <td style={{...td,color:C.m,fontSize:11}}>{a.branch||"—"}</td>
+          <td style={{...td,color:C.m,fontSize:11}}>{a.state||"—"}</td>
           <td style={{...td,fontSize:11}}>{a.field_officer_id?<span style={{color:C.g,fontWeight:600}}>👤 {foName(a.field_officer_id,users)}</span>:<span style={{color:C.d}}>—</span>}</td>
           <td style={td}><span style={dot(hC(a.health,stg.healthStatuses))}/>{a.health}</td>
           <td style={{...td,color:C.g,fontWeight:600}}>{$f(Number(a.contract_value),stg.currency)}/yr</td>
