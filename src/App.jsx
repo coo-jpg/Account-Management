@@ -199,7 +199,7 @@ export default function App(){
   // ─── DERIVED (scoped) ───
   const scopedAccs=accs.filter(inScope);
   const sel=accs.find(a=>a.id===selId);
-  const fil=scopedAccs.filter(a=>{const mf=flt==="All"||a.health===flt||a.status===flt||a.branch===flt;const ms=a.client.toLowerCase().includes(srch.toLowerCase())||(a.location||"").toLowerCase().includes(srch.toLowerCase())||(a.account_code||"").toLowerCase().includes(srch.toLowerCase());return mf&&ms});
+  const fil=scopedAccs.filter(a=>{const mf=flt==="All"||a.health===flt||a.status===flt||a.state===flt;const ms=a.client.toLowerCase().includes(srch.toLowerCase())||(a.location||"").toLowerCase().includes(srch.toLowerCase())||(a.account_code||"").toLowerCase().includes(srch.toLowerCase());return mf&&ms});
   const totCV=scopedAccs.reduce((s,a)=>s+Number(a.contract_value),0);
   const totP=scopedAccs.reduce((s,a)=>s+Number(a.pending_amount),0);
   const totR=scopedAccs.reduce((s,a)=>s+tS(a.staff_breakdown,"required"),0);
