@@ -279,7 +279,7 @@ export default function App(){
     {(renS>0||cGap>0||ag.o9>0)&&<div style={{...sec,borderColor:"#7f5a08",marginBottom:16}}><div style={{...secT,color:C.yl,borderColor:"#7f5a08"}}>⚠ ALERTS</div>{renS>0&&<div style={{color:C.yl,fontSize:12,marginBottom:4}}>• {renS} contract(s) within {stg.alertThresholds.renewalDays}d</div>}{cGap>0&&<div style={{color:C.rd,fontSize:12,marginBottom:4}}>• {cGap} compliance gaps</div>}{ag.o9>0&&<div style={{color:C.rd,fontSize:12}}>• {$f(ag.o9,stg.currency)} overdue 90+d</div>}</div>}
     <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
       <input style={{...inp,width:200,flexShrink:0}} placeholder="Search client/code..." value={srch} onChange={e=>setSrch(e.target.value)}/>
-      {["All",...stg.healthStatuses.map(h=>h.key),...stg.accountStatuses,...(stg.branches||[])].map(f=><button key={f} style={nb(flt===f)} onClick={()=>setFlt(f)}>{f}</button>)}
+      {["All",...stg.healthStatuses.map(h=>h.key),...stg.accountStatuses,...[...new Set(accs.map(a=>a.state).filter(Boolean))]].map(f=><button key={f} style={nb(flt===f)} onClick={()=>setFlt(f)}>{f}</button>)}
       <div style={{flex:1}}/>
       <button style={sb("s")} onClick={xCSV}>📥 CSV</button>
       <button style={sb("s")} onClick={loadAll}>🔄</button>
