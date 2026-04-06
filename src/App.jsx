@@ -272,7 +272,7 @@ export default function App(){
 
   // ═══ DASHBOARD ═══
   const Dash=()=><>
-    {uScope!=="org"&&!isA&&<div style={{background:"#1a2418",border:`1px solid ${C.bd}`,padding:"8px 14px",marginBottom:14,fontSize:11,color:C.g,letterSpacing:1}}>🔒 SCOPE: {uScope==="branch"?`BRANCH · ${uBranch||"—"}`:`FIELD OFFICER · ${user.full_name||user.username} · ${scopedAccs.length} assigned account(s)`}</div>}
+    {uScope!=="org"&&!isA&&<div style={{background:"#1a2418",border:`1px solid ${C.bd}`,padding:"8px 14px",marginBottom:14,fontSize:11,color:C.g,letterSpacing:1}}>🔒 SCOPE: {uScope==="branch"?`STATE · ${uBranch||"—"}`:`FIELD OFFICER · ${user.full_name||user.username} · ${scopedAccs.length} assigned account(s)`}</div>}
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(155px,1fr))",gap:14,marginBottom:20}}>
       {[{l:"Accounts",v:actA.length,s:`${scopedAccs.length} total`,c:C.g},{l:"Monthly",v:$f(totCV/12,stg.currency),s:`ACV ${$f(totCV,stg.currency)}`,c:C.g},{l:"Receivables",v:$f(totP,stg.currency),s:`${cR.toFixed(0)}% collected`,c:totP>0?C.yl:C.gn},{l:"Staff",v:`${totD}/${totR}`,s:totD<totR?`${totR-totD} short`:"Full",c:totD<totR?C.yl:C.gn},{l:"DSO",v:`${dso.toFixed(0)}d`,s:dso<45?"Healthy":"Review",c:dso<45?C.gn:C.yl}].map((x,i)=><div key={i} style={{background:C.p,border:`1px solid ${C.bd}`,padding:14}}><div style={{fontSize:10,color:C.m,letterSpacing:2,textTransform:"uppercase"}}>{x.l}</div><div style={{fontSize:24,fontWeight:700,color:x.c}}>{x.v}</div><div style={{fontSize:10,color:C.d,marginTop:2}}>{x.s}</div></div>)}
     </div>
