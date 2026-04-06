@@ -44,6 +44,7 @@ const dTo = d => Math.ceil((new Date(d)-new Date())/864e5);
 const dSn = d => Math.ceil((new Date()-new Date(d))/864e5);
 const hC = (h,hs) => hs.find(x=>x.key===h)?.color||"#888";
 const tS = (sb,t) => Object.values(sb||{}).reduce((s,v)=>s+(v[t]||0),0);
+const foName = (id,users) => {if(!id)return"—";const u=(users||[]).find(x=>x.id===id);return u?(u.full_name||u.username):"—"};
 
 // ═══ STYLED BLOCKS ═══
 const inp = {background:C.p,border:`1px solid ${C.bd}`,color:C.t,padding:"8px 12px",fontSize:12,fontFamily:F,width:"100%",boxSizing:"border-box",outline:"none"};
@@ -67,7 +68,7 @@ function DocUp({docs,onUp,onRm}){const r=useRef();return<div><div style={{displa
 
 function InEd({value,onChange,style:st}){const[ed,setEd]=useState(false),[v,setV]=useState(value),r=useRef();useEffect(()=>{if(ed&&r.current)r.current.focus()},[ed]);if(!ed)return<span style={{...st,cursor:"pointer",borderBottom:`1px dashed ${C.bd}`}} onClick={()=>{setV(value);setEd(true)}}>{value}</span>;return<input ref={r} style={{...inp,...st,width:"auto",minWidth:50}} value={v} onChange={e=>setV(e.target.value)} onBlur={()=>{onChange(v);setEd(false)}} onKeyDown={e=>{if(e.key==="Enter"){onChange(v);setEd(false)}if(e.key==="Escape")setEd(false)}}/>}
 
-const mkCSV = (accs,s) => {const rl=s.staffRoles.map(r=>r.key),cm=s.complianceItems.map(c=>c.key);const hd=["ID","Code","Client","Location","Type","Status","Health","Value","Billing","Terms","Start","End","Renewal","Pending","TotReq","TotDep",...rl.flatMap(r=>[`${r}_R`,`${r}_D`]),...cm.map(c=>`C_${c}`),"Paid","Notes"];const rows=accs.map(a=>[a.account_id,a.account_code||"",`"${a.client}"`,`"${a.location||""}"`,a.service_type,a.status,a.health,a.contract_value,a.billing_cycle,a.payment_terms,a.contract_start,a.contract_end,a.renewal_status||"",a.pending_amount,tS(a.staff_breakdown,"required"),tS(a.staff_breakdown,"deployed"),...rl.flatMap(r=>[a.staff_breakdown?.[r]?.required||0,a.staff_breakdown?.[r]?.deployed||0]),...cm.map(c=>a.compliance_status?.[c]?"Y":"N"),(a._p||[]).reduce((s,p)=>s+Number(p.amount),0),`"${(a.notes||"").replace(/"/g,'""')}"`].join(","));return hd.join(",")+"\n"+rows.join("\n")};
+const mkCSV = (accs,s,users) => {const rl=s.staffRoles.map(r=>r.key),cm=s.complianceItems.map(c=>c.key);const hd=["ID","Code","Client","Location","Type","Status","Health","Value","Billing","Terms","Start","End","Renewal","Pending","FieldOfficer","TotReq","TotDep",...rl.flatMap(r=>[`${r}_R`,`${r}_D`]),...cm.map(c=>`C_${c}`),"Paid","Notes"];const rows=accs.map(a=>[a.account_id,a.account_code||"",`"${a.client}"`,`"${a.location||""}"`,a.service_type,a.status,a.health,a.contract_value,a.billing_cycle,a.payment_terms,a.contract_start,a.contract_end,a.renewal_status||"",a.pending_amount,`"${foName(a.field_officer_id,users)}"`,tS(a.staff_breakdown,"required"),tS(a.staff_breakdown,"deployed"),...rl.flatMap(r=>[a.staff_breakdown?.[r]?.required||0,a.staff_breakdown?.[r]?.deployed||0]),...cm.map(c=>a.compliance_status?.[c]?"Y":"N"),(a._p||[]).reduce((s,p)=>s+Number(p.amount),0),`"${(a.notes||"").replace(/"/g,'""')}"`].join(","));return hd.join(",")+"\n"+rows.join("\n")};
 
 // ═══════════════════════
 // MAIN APP
@@ -95,12 +96,19 @@ export default function App(){
   const[toast,setToast]=useState(null);
   const[users,setUsers]=useState([]);
   const[showUF,setSUF]=useState(false);
-  const[uf,setUF]=useState({username:"",password:"",full_name:"",role:"user"});
+  const[uf,setUF]=useState({username:"",password:"",full_name:"",role:"user",scope_level:"org",scope_branch:"",view_permissions:{dashboard:true,command:true,analytics:true,notifications:true}});
   const[notifs,setNotifs]=useState([]);
   const[notifTick,setNotifTick]=useState(0);
 
   const tw = m => {setToast(m);setTimeout(()=>setToast(null),2500)};
   const isA = user?.role==="admin";
+
+  // ─── SCOPING & PERMISSIONS ───
+  const uScope = user?.scope_level||"org";
+  const uBranch = user?.scope_branch||"";
+  const vPerms = user?.view_permissions||{dashboard:true,command:true,analytics:true,notifications:true};
+  const canSee = v => isA||vPerms[v]!==false;
+  const inScope = a => {if(isA||uScope==="org")return true;if(uScope==="branch")return a.branch===uBranch;if(uScope==="site")return a.field_officer_id===user.id;return false};
 
   // ─── AUTH via RPC (server-side bcrypt) ───
   const doLogin = async () => {
@@ -140,9 +148,7 @@ export default function App(){
       loadAll();
       loadUsers();
       loadNotifs();
-      // Run cleanup once per session
       rpc("cleanup_old_todo_notifications",{}).catch(()=>{});
-      // Refresh notifications every 45 seconds
       const iv=setInterval(()=>setNotifTick(t=>t+1),45000);
       return ()=>clearInterval(iv);
     }
@@ -170,7 +176,7 @@ export default function App(){
   const uS=async p=>{const u={...stg,...p};setStg(u);if(stgId)await patch("account_settings",`?id=eq.${stgId}`,{settings_data:u});tw("Saved")};
 
   // ─── ACCOUNT CRUD ───
-  const mkE=()=>({account_id:"",account_code:"",client:"",location:"",service_type:stg.serviceTypes[0]||"",contract_value:0,billing_cycle:stg.defaultBillingCycle,contract_start:"",contract_end:"",invoice_day:stg.invoiceDayDefault,payment_terms:stg.defaultPaymentTerms,status:stg.defaultStatus,health:stg.defaultHealth,staff_breakdown:Object.fromEntries(stg.staffRoles.map(r=>[r.key,{required:0,deployed:0}])),pending_amount:0,compliance_status:Object.fromEntries(stg.complianceItems.map(c=>[c.key,false])),contacts:[{name:"",phone:"",role:"POC"}],notes:stg.notesTemplate,renewal_status:stg.renewalStatuses?.[0]||"Pending",branch:stg.branches?.[0]||"",rate_revision:0,custom_data:{},_p:[],_d:[]});
+  const mkE=()=>({account_id:"",account_code:"",client:"",location:"",service_type:stg.serviceTypes[0]||"",contract_value:0,billing_cycle:stg.defaultBillingCycle,contract_start:"",contract_end:"",invoice_day:stg.invoiceDayDefault,payment_terms:stg.defaultPaymentTerms,status:stg.defaultStatus,health:stg.defaultHealth,staff_breakdown:Object.fromEntries(stg.staffRoles.map(r=>[r.key,{required:0,deployed:0}])),pending_amount:0,compliance_status:Object.fromEntries(stg.complianceItems.map(c=>[c.key,false])),contacts:[{name:"",phone:"",role:"POC"}],notes:stg.notesTemplate,renewal_status:stg.renewalStatuses?.[0]||"Pending",branch:stg.branches?.[0]||"",rate_revision:0,field_officer_id:null,custom_data:{},_p:[],_d:[]});
   const saveAcc=async()=>{if(!fd)return;setSyncing(true);
     if(eMode){const{_p,_d,id,created_at,updated_at,...rest}=fd;await patch("accounts",`?id=eq.${fd.id}`,rest)}
     else{const nums=accs.map(a=>parseInt(a.account_id.replace("ACC-",""))||0);const nx=Math.max(0,...nums)+1;const{_p,_d,id,...rest}=fd;await post("accounts",{...rest,account_id:`ACC-${String(nx).padStart(3,"0")}`})}
@@ -183,28 +189,41 @@ export default function App(){
 
   // ─── USER MGMT via RPC ───
   const createUser=async()=>{if(!uf.username||!uf.password){tw("Username & password required");return}
-    const res=await rpc("acm_create_user",{p_username:uf.username,p_password:uf.password,p_full_name:uf.full_name,p_role:uf.role});
-    if(res&&res.length>0){await loadUsers();setSUF(false);setUF({username:"",password:"",full_name:"",role:"user"});tw("User created")}else tw("Failed - username may exist")};
+    const res=await rpc("acm_create_user",{p_username:uf.username,p_password:uf.password,p_full_name:uf.full_name,p_role:uf.role,p_scope_level:uf.scope_level,p_scope_branch:uf.scope_branch||null,p_view_permissions:uf.view_permissions});
+    if(res&&res.length>0){await loadUsers();setSUF(false);setUF({username:"",password:"",full_name:"",role:"user",scope_level:"org",scope_branch:"",view_permissions:{dashboard:true,command:true,analytics:true,notifications:true}});tw("User created")}else tw("Failed - username may exist")};
   const toggleUser=async(id,active)=>{await patch("acm_users",`?id=eq.${id}`,{is_active:!active});await loadUsers();tw(active?"Deactivated":"Activated")};
   const changeRole=async(id,role)=>{await patch("acm_users",`?id=eq.${id}`,{role});await loadUsers();tw("Role updated")};
+  const updateUserField=async(id,data)=>{await patch("acm_users",`?id=eq.${id}`,data);await loadUsers();tw("Updated")};
+  const vpToggle=async(u,key)=>{const vp={...(u.view_permissions||{dashboard:true,command:true,analytics:true,notifications:true})};vp[key]=!vp[key];await updateUserField(u.id,{view_permissions:vp})};
 
-  // ─── DERIVED ───
+  // ─── DERIVED (scoped) ───
+  const scopedAccs=accs.filter(inScope);
   const sel=accs.find(a=>a.id===selId);
-  const fil=accs.filter(a=>{const mf=flt==="All"||a.health===flt||a.status===flt||a.branch===flt;const ms=a.client.toLowerCase().includes(srch.toLowerCase())||(a.location||"").toLowerCase().includes(srch.toLowerCase())||(a.account_code||"").toLowerCase().includes(srch.toLowerCase());return mf&&ms});
-  const totCV=accs.reduce((s,a)=>s+Number(a.contract_value),0);
-  const totP=accs.reduce((s,a)=>s+Number(a.pending_amount),0);
-  const totR=accs.reduce((s,a)=>s+tS(a.staff_breakdown,"required"),0);
-  const totD=accs.reduce((s,a)=>s+tS(a.staff_breakdown,"deployed"),0);
-  const renS=accs.filter(a=>{const d=dTo(a.contract_end);return d<=stg.alertThresholds.renewalDays&&d>0}).length;
-  const cGap=accs.filter(a=>Object.values(a.compliance_status||{}).some(v=>!v)).length;
-  const totCol=accs.reduce((s,a)=>s+(a._p||[]).reduce((ps,p)=>ps+Number(p.amount),0),0);
+  const fil=scopedAccs.filter(a=>{const mf=flt==="All"||a.health===flt||a.status===flt||a.branch===flt;const ms=a.client.toLowerCase().includes(srch.toLowerCase())||(a.location||"").toLowerCase().includes(srch.toLowerCase())||(a.account_code||"").toLowerCase().includes(srch.toLowerCase());return mf&&ms});
+  const totCV=scopedAccs.reduce((s,a)=>s+Number(a.contract_value),0);
+  const totP=scopedAccs.reduce((s,a)=>s+Number(a.pending_amount),0);
+  const totR=scopedAccs.reduce((s,a)=>s+tS(a.staff_breakdown,"required"),0);
+  const totD=scopedAccs.reduce((s,a)=>s+tS(a.staff_breakdown,"deployed"),0);
+  const renS=scopedAccs.filter(a=>{const d=dTo(a.contract_end);return d<=stg.alertThresholds.renewalDays&&d>0}).length;
+  const cGap=scopedAccs.filter(a=>Object.values(a.compliance_status||{}).some(v=>!v)).length;
+  const totCol=scopedAccs.reduce((s,a)=>s+(a._p||[]).reduce((ps,p)=>ps+Number(p.amount),0),0);
   const totBil=totCol+totP;
   const cR=totBil>0?(totCol/totBil)*100:100;
-  const actA=accs.filter(a=>a.status==="Active");
+  const actA=scopedAccs.filter(a=>a.status==="Active");
   const dso=actA.length>0?actA.reduce((s,a)=>{if(!a._p?.length)return s+a.payment_terms;return s+dSn(a._p[0].payment_date)},0)/actA.length:0;
   const ag={c:0,d3:0,d6:0,o9:0};
-  accs.forEach(a=>{if(Number(a.pending_amount)<=0)return;const lp=a._p?.[0]?.payment_date||a.contract_start;const d=dSn(lp);if(d<=30)ag.c+=Number(a.pending_amount);else if(d<=60)ag.d3+=Number(a.pending_amount);else if(d<=90)ag.d6+=Number(a.pending_amount);else ag.o9+=Number(a.pending_amount)});
-  const xCSV=()=>{const c=mkCSV(accs,stg);const b=new Blob([c],{type:"text/csv"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=`bbcss_${new Date().toISOString().split("T")[0]}.csv`;a.click();tw("Exported")};
+  scopedAccs.forEach(a=>{if(Number(a.pending_amount)<=0)return;const lp=a._p?.[0]?.payment_date||a.contract_start;const d=dSn(lp);if(d<=30)ag.c+=Number(a.pending_amount);else if(d<=60)ag.d3+=Number(a.pending_amount);else if(d<=90)ag.d6+=Number(a.pending_amount);else ag.o9+=Number(a.pending_amount)});
+  const xCSV=()=>{const c=mkCSV(scopedAccs,stg,users);const b=new Blob([c],{type:"text/csv"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=`bbcss_${new Date().toISOString().split("T")[0]}.csv`;a.click();tw("Exported")};
+
+  // ─── VIEW ACCESS GUARD ───
+  useEffect(()=>{
+    if(!user)return;
+    const needsPerm=["dashboard","command","analytics","notifications"];
+    if(needsPerm.includes(view)&&!canSee(view)){
+      const first=needsPerm.find(v=>canSee(v));
+      if(first)setView(first);else if(isA)setView("users");
+    }
+  },[user,view]);// eslint-disable-line
 
   // ═══ LOGIN SCREEN ═══
   if(!user)return(
@@ -226,7 +245,7 @@ export default function App(){
 
   // ═══ ANALYTICS ═══
   const Analytics=()=>{
-    const sbr={};stg.staffRoles.forEach(r=>{sbr[r.key]={req:0,dep:0,label:r.label}});accs.forEach(a=>Object.entries(a.staff_breakdown||{}).forEach(([k,v])=>{if(sbr[k]){sbr[k].req+=v.required||0;sbr[k].dep+=v.deployed||0}}));
+    const sbr={};stg.staffRoles.forEach(r=>{sbr[r.key]={req:0,dep:0,label:r.label}});scopedAccs.forEach(a=>Object.entries(a.staff_breakdown||{}).forEach(([k,v])=>{if(sbr[k]){sbr[k].req+=v.required||0;sbr[k].dep+=v.deployed||0}}));
     const mx=Math.max(1,...Object.values(sbr).map(v=>v.req));const at=ag.c+ag.d3+ag.d6+ag.o9;
     return<><div style={{...sec,borderColor:C.g}}><div style={secT}>📊 COLLECTION HEALTH</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:14,marginBottom:16}}>
@@ -241,20 +260,21 @@ export default function App(){
         {Object.entries(sbr).filter(([,v])=>v.req>0).map(([k,v])=><div key={k} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:4}}><span style={{color:C.t}}>{v.label}</span><span><span style={{color:v.dep>=v.req?C.gn:C.yl}}>{v.dep}</span><span style={{color:C.d}}>/{v.req}</span></span></div><div style={{height:8,background:"#1a2418",borderRadius:4,overflow:"hidden",position:"relative"}}><div style={{position:"absolute",height:"100%",width:`${(v.req/mx)*100}%`,background:C.bd,borderRadius:4}}/><div style={{position:"absolute",height:"100%",width:`${(v.dep/mx)*100}%`,background:v.dep>=v.req?C.gn:C.yl,borderRadius:4}}/></div></div>)}
       </div>
       <div style={sec}><div style={secT}>🔄 RENEWAL PIPELINE</div>
-        {accs.filter(a=>a.status==="Active").sort((a,b)=>dTo(a.contract_end)-dTo(b.contract_end)).slice(0,8).map(a=>{const d=dTo(a.contract_end);return<div key={a.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`1px solid ${C.bg}`,cursor:"pointer"}} onClick={()=>{setSelId(a.id);setView("detail")}}><span style={dot(d<=30?C.rd:d<=stg.alertThresholds.renewalDays?C.yl:C.gn)}/><span style={{flex:1,fontSize:11,color:C.t}}>{a.client}</span><span style={pill(a.renewal_status==="Renewed"?C.gn:a.renewal_status==="Lost"?C.rd:C.yl)}>{a.renewal_status||"Pending"}</span><span style={{fontSize:10,color:d<=30?C.rd:C.m,fontWeight:700}}>{d}d</span></div>})}
+        {scopedAccs.filter(a=>a.status==="Active").sort((a,b)=>dTo(a.contract_end)-dTo(b.contract_end)).slice(0,8).map(a=>{const d=dTo(a.contract_end);return<div key={a.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`1px solid ${C.bg}`,cursor:"pointer"}} onClick={()=>{setSelId(a.id);setView("detail")}}><span style={dot(d<=30?C.rd:d<=stg.alertThresholds.renewalDays?C.yl:C.gn)}/><span style={{flex:1,fontSize:11,color:C.t}}>{a.client}</span><span style={pill(a.renewal_status==="Renewed"?C.gn:a.renewal_status==="Lost"?C.rd:C.yl)}>{a.renewal_status||"Pending"}</span><span style={{fontSize:10,color:d<=30?C.rd:C.m,fontWeight:700}}>{d}d</span></div>})}
       </div>
     </div>
     <div style={{...sec,marginTop:14}}><div style={secT}>📈 EFFECTIVENESS</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14}}>
-        {[{l:"Staffing",sc:totR>0?(totD/totR)*100:100},{l:"Collection",sc:cR},{l:"Compliance",sc:accs.length>0?(accs.length-cGap)/accs.length*100:100},{l:"Renewal",sc:actA.length>0?(actA.length-renS)/actA.length*100:100}].map((x,i)=>{const co=x.sc>=80?C.gn:x.sc>=60?C.yl:C.rd;return<div key={i} style={{background:C.bg,padding:14}}><div style={{fontSize:10,color:C.m}}>{x.l}</div><div style={{fontSize:26,fontWeight:700,color:co,margin:"4px 0"}}>{x.sc.toFixed(1)}%</div><div style={{height:4,background:"#1a2418",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${Math.min(100,x.sc)}%`,background:co,borderRadius:2}}/></div></div>})}
+        {[{l:"Staffing",sc:totR>0?(totD/totR)*100:100},{l:"Collection",sc:cR},{l:"Compliance",sc:scopedAccs.length>0?(scopedAccs.length-cGap)/scopedAccs.length*100:100},{l:"Renewal",sc:actA.length>0?(actA.length-renS)/actA.length*100:100}].map((x,i)=>{const co=x.sc>=80?C.gn:x.sc>=60?C.yl:C.rd;return<div key={i} style={{background:C.bg,padding:14}}><div style={{fontSize:10,color:C.m}}>{x.l}</div><div style={{fontSize:26,fontWeight:700,color:co,margin:"4px 0"}}>{x.sc.toFixed(1)}%</div><div style={{height:4,background:"#1a2418",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${Math.min(100,x.sc)}%`,background:co,borderRadius:2}}/></div></div>})}
       </div></div>
     <J3S/></>;
   };
 
   // ═══ DASHBOARD ═══
   const Dash=()=><>
+    {uScope!=="org"&&!isA&&<div style={{background:"#1a2418",border:`1px solid ${C.bd}`,padding:"8px 14px",marginBottom:14,fontSize:11,color:C.g,letterSpacing:1}}>🔒 SCOPE: {uScope==="branch"?`BRANCH · ${uBranch||"—"}`:`FIELD OFFICER · ${user.full_name||user.username} · ${scopedAccs.length} assigned account(s)`}</div>}
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(155px,1fr))",gap:14,marginBottom:20}}>
-      {[{l:"Accounts",v:actA.length,s:`${accs.length} total`,c:C.g},{l:"Monthly",v:$f(totCV/12,stg.currency),s:`ACV ${$f(totCV,stg.currency)}`,c:C.g},{l:"Receivables",v:$f(totP,stg.currency),s:`${cR.toFixed(0)}% collected`,c:totP>0?C.yl:C.gn},{l:"Staff",v:`${totD}/${totR}`,s:totD<totR?`${totR-totD} short`:"Full",c:totD<totR?C.yl:C.gn},{l:"DSO",v:`${dso.toFixed(0)}d`,s:dso<45?"Healthy":"Review",c:dso<45?C.gn:C.yl}].map((x,i)=><div key={i} style={{background:C.p,border:`1px solid ${C.bd}`,padding:14}}><div style={{fontSize:10,color:C.m,letterSpacing:2,textTransform:"uppercase"}}>{x.l}</div><div style={{fontSize:24,fontWeight:700,color:x.c}}>{x.v}</div><div style={{fontSize:10,color:C.d,marginTop:2}}>{x.s}</div></div>)}
+      {[{l:"Accounts",v:actA.length,s:`${scopedAccs.length} total`,c:C.g},{l:"Monthly",v:$f(totCV/12,stg.currency),s:`ACV ${$f(totCV,stg.currency)}`,c:C.g},{l:"Receivables",v:$f(totP,stg.currency),s:`${cR.toFixed(0)}% collected`,c:totP>0?C.yl:C.gn},{l:"Staff",v:`${totD}/${totR}`,s:totD<totR?`${totR-totD} short`:"Full",c:totD<totR?C.yl:C.gn},{l:"DSO",v:`${dso.toFixed(0)}d`,s:dso<45?"Healthy":"Review",c:dso<45?C.gn:C.yl}].map((x,i)=><div key={i} style={{background:C.p,border:`1px solid ${C.bd}`,padding:14}}><div style={{fontSize:10,color:C.m,letterSpacing:2,textTransform:"uppercase"}}>{x.l}</div><div style={{fontSize:24,fontWeight:700,color:x.c}}>{x.v}</div><div style={{fontSize:10,color:C.d,marginTop:2}}>{x.s}</div></div>)}
     </div>
     {(renS>0||cGap>0||ag.o9>0)&&<div style={{...sec,borderColor:"#7f5a08",marginBottom:16}}><div style={{...secT,color:C.yl,borderColor:"#7f5a08"}}>⚠ ALERTS</div>{renS>0&&<div style={{color:C.yl,fontSize:12,marginBottom:4}}>• {renS} contract(s) within {stg.alertThresholds.renewalDays}d</div>}{cGap>0&&<div style={{color:C.rd,fontSize:12,marginBottom:4}}>• {cGap} compliance gaps</div>}{ag.o9>0&&<div style={{color:C.rd,fontSize:12}}>• {$f(ag.o9,stg.currency)} overdue 90+d</div>}</div>}
     <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
@@ -265,12 +285,13 @@ export default function App(){
       <button style={sb("s")} onClick={loadAll}>🔄</button>
       {isA&&<button style={bt("p")} onClick={()=>{setFD(mkE());setEM(false);setSF(true)}}>+ NEW</button>}
     </div>
-    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{["Client","Code","Branch","Health","Contract","Staff","Pending","Renewal","Comp"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>
+    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{["Client","Code","Branch","Field Officer","Health","Contract","Staff","Pending","Renewal","Comp"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>
       {fil.map(a=>{const d=dTo(a.contract_end),sr=tS(a.staff_breakdown,"required"),sd=tS(a.staff_breakdown,"deployed"),ok=Object.values(a.compliance_status||{}).every(Boolean);
         return<tr key={a.id} style={{cursor:"pointer"}} onClick={()=>{setSelId(a.id);setView("detail")}} onMouseEnter={e=>e.currentTarget.style.background="#1a2418"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
           <td style={td}><div style={{fontWeight:700}}>{a.client}</div><div style={{fontSize:10,color:C.d}}>{a.account_id} · {a.location}</div></td>
           <td style={{...td,color:C.bl,fontWeight:600}}>{a.account_code||"—"}</td>
           <td style={{...td,color:C.m,fontSize:11}}>{a.branch||"—"}</td>
+          <td style={{...td,fontSize:11}}>{a.field_officer_id?<span style={{color:C.g,fontWeight:600}}>👤 {foName(a.field_officer_id,users)}</span>:<span style={{color:C.d}}>—</span>}</td>
           <td style={td}><span style={dot(hC(a.health,stg.healthStatuses))}/>{a.health}</td>
           <td style={{...td,color:C.g,fontWeight:600}}>{$f(Number(a.contract_value),stg.currency)}/yr</td>
           <td style={td}><span style={{color:sd<sr?C.yl:C.gn}}>{sd}</span><span style={{color:C.d}}>/{sr}</span></td>
@@ -278,7 +299,7 @@ export default function App(){
           <td style={td}><span style={pill(d<=30?C.rd:d<=stg.alertThresholds.renewalDays?C.yl:C.gn)}>{d}d</span></td>
           <td style={td}><span style={pill(ok?C.gn:C.rd)}>{ok?"OK":"GAPS"}</span></td>
         </tr>})}
-      {fil.length===0&&<tr><td colSpan={8} style={{...td,textAlign:"center",color:C.d,padding:40}}>No accounts</td></tr>}
+      {fil.length===0&&<tr><td colSpan={10} style={{...td,textAlign:"center",color:C.d,padding:40}}>No accounts</td></tr>}
     </tbody></table></div>
     <J3S/></>;
 
@@ -293,7 +314,7 @@ export default function App(){
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14,marginBottom:14}}>
         <div style={sec}><div style={secT}>CONTRACT</div>
-          {[["Value",$f(Number(a.contract_value),stg.currency)+"/yr"],["Monthly",$f(Number(a.contract_value)/12,stg.currency)],["Code",a.account_code||"—"],["Billing",a.billing_cycle],["Terms",a.payment_terms+"d"],["Period",`${$d(a.contract_start)} → ${$d(a.contract_end)}`],["Status",a.status]].map(([l,v])=><div key={l} style={dr}><span style={{color:C.m,fontSize:11}}>{l}</span><span style={{color:C.t,fontSize:12,fontWeight:600}}>{v}</span></div>)}
+          {[["Value",$f(Number(a.contract_value),stg.currency)+"/yr"],["Monthly",$f(Number(a.contract_value)/12,stg.currency)],["Code",a.account_code||"—"],["Billing",a.billing_cycle],["Terms",a.payment_terms+"d"],["Period",`${$d(a.contract_start)} → ${$d(a.contract_end)}`],["Status",a.status],["Field Officer",foName(a.field_officer_id,users)]].map(([l,v])=><div key={l} style={dr}><span style={{color:C.m,fontSize:11}}>{l}</span><span style={{color:C.t,fontSize:12,fontWeight:600}}>{v}</span></div>)}
           <div style={{marginTop:10,fontSize:11,color:C.g,letterSpacing:2}}>RENEWAL</div>
           <div style={{display:"flex",gap:10,alignItems:"center",marginTop:6,flexWrap:"wrap"}}>
             <span style={pill(d<=30?C.rd:d<=stg.alertThresholds.renewalDays?C.yl:C.gn)}>{d} DAYS</span>
@@ -329,17 +350,31 @@ export default function App(){
   // ═══ USERS ═══
   const Usr=()=><div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><div style={{fontSize:14,color:C.g,letterSpacing:2,fontWeight:700}}>USER MANAGEMENT</div><button style={bt("p")} onClick={()=>setSUF(true)}>+ NEW USER</button></div>
-    <table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{["Username","Name","Role","Active","Last Login","Actions"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>
-      {users.map(u=><tr key={u.id}><td style={td}><span style={{fontWeight:700}}>{u.username}</span></td><td style={td}>{u.full_name||"—"}</td><td style={td}><span style={pill(u.role==="admin"?C.g:C.bl)}>{u.role.toUpperCase()}</span></td><td style={td}><span style={dot(u.is_active?C.gn:C.rd)}/>{u.is_active?"Active":"Off"}</td><td style={{...td,fontSize:11,color:C.m}}>{u.last_login?$d(u.last_login):"Never"}</td>
-        <td style={td}>{u.id!==user.id&&<div style={{display:"flex",gap:6}}><button style={sb(u.is_active?"d":"s")} onClick={()=>toggleUser(u.id,u.is_active)}>{u.is_active?"DISABLE":"ENABLE"}</button><select style={{...inp,width:80,padding:"2px 6px",fontSize:10}} value={u.role} onChange={e=>changeRole(u.id,e.target.value)}><option value="admin">Admin</option><option value="user">User</option></select></div>}</td></tr>)}
-    </tbody></table>
+    <div style={{fontSize:10,color:C.m,marginBottom:10,letterSpacing:1}}>SCOPE: <span style={{color:C.g}}>ORG</span> = all branches · <span style={{color:C.bl}}>BRANCH</span> = one branch only · <span style={{color:C.yl}}>SITE</span> = only accounts where they're the field officer</div>
+    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:1100}}><thead><tr>{["Username","Name","Role","Scope","Branch","Views","Active","Last Login","Actions"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>
+      {users.map(u=>{const vp=u.view_permissions||{dashboard:true,command:true,analytics:true,notifications:true};const isSelf=u.id===user.id;
+        return<tr key={u.id}>
+          <td style={td}><span style={{fontWeight:700}}>{u.username}</span></td>
+          <td style={td}>{u.full_name||"—"}</td>
+          <td style={td}><span style={pill(u.role==="admin"?C.g:C.bl)}>{u.role.toUpperCase()}</span></td>
+          <td style={td}>{isSelf?<span style={pill(C.g)}>{(u.scope_level||"org").toUpperCase()}</span>:<select style={{...inp,width:90,padding:"2px 6px",fontSize:10}} value={u.scope_level||"org"} onChange={e=>updateUserField(u.id,{scope_level:e.target.value,...(e.target.value!=="branch"?{scope_branch:null}:{})})}><option value="org">Org</option><option value="branch">Branch</option><option value="site">Site</option></select>}</td>
+          <td style={td}>{u.scope_level==="branch"?(isSelf?<span style={{color:C.t}}>{u.scope_branch||"—"}</span>:<select style={{...inp,width:110,padding:"2px 6px",fontSize:10}} value={u.scope_branch||""} onChange={e=>updateUserField(u.id,{scope_branch:e.target.value})}><option value="">—</option>{(stg.branches||[]).map(b=><option key={b} value={b}>{b}</option>)}</select>):<span style={{color:C.d}}>—</span>}</td>
+          <td style={td}>{u.role==="admin"?<span style={{color:C.d,fontSize:10}}>ALL (admin)</span>:<div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{[["dashboard","DASH"],["command","CMD"],["analytics","ANL"],["notifications","NOTIF"]].map(([k,l])=><label key={k} style={{display:"flex",alignItems:"center",gap:3,fontSize:9,cursor:isSelf?"default":"pointer",color:vp[k]?C.gn:C.d}}><input type="checkbox" checked={vp[k]!==false} disabled={isSelf} onChange={()=>vpToggle(u,k)} style={{margin:0,cursor:isSelf?"default":"pointer"}}/>{l}</label>)}</div>}</td>
+          <td style={td}><span style={dot(u.is_active?C.gn:C.rd)}/>{u.is_active?"Active":"Off"}</td>
+          <td style={{...td,fontSize:11,color:C.m}}>{u.last_login?$d(u.last_login):"Never"}</td>
+          <td style={td}>{!isSelf&&<div style={{display:"flex",gap:6}}><button style={sb(u.is_active?"d":"s")} onClick={()=>toggleUser(u.id,u.is_active)}>{u.is_active?"DISABLE":"ENABLE"}</button><select style={{...inp,width:80,padding:"2px 6px",fontSize:10}} value={u.role} onChange={e=>changeRole(u.id,e.target.value)}><option value="admin">Admin</option><option value="user">User</option></select></div>}</td>
+        </tr>})}
+    </tbody></table></div>
     {showUF&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setSUF(false)}>
-      <div style={{background:C.dk,border:`2px solid ${C.g}`,padding:24,width:360}} onClick={e=>e.stopPropagation()}>
+      <div style={{background:C.dk,border:`2px solid ${C.g}`,padding:24,width:400,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
         <div style={{fontSize:14,fontWeight:700,color:C.g,letterSpacing:2,marginBottom:16}}>CREATE USER</div>
         <div style={{marginBottom:10}}><label style={lbl}>Username</label><input style={inp} value={uf.username} onChange={e=>setUF({...uf,username:e.target.value})}/></div>
         <div style={{marginBottom:10}}><label style={lbl}>Password</label><input style={inp} type="password" value={uf.password} onChange={e=>setUF({...uf,password:e.target.value})}/></div>
         <div style={{marginBottom:10}}><label style={lbl}>Full Name</label><input style={inp} value={uf.full_name} onChange={e=>setUF({...uf,full_name:e.target.value})}/></div>
-        <div style={{marginBottom:14}}><label style={lbl}>Role</label><select style={inp} value={uf.role} onChange={e=>setUF({...uf,role:e.target.value})}><option value="user">User</option><option value="admin">Admin</option></select></div>
+        <div style={{marginBottom:10}}><label style={lbl}>Role</label><select style={inp} value={uf.role} onChange={e=>setUF({...uf,role:e.target.value})}><option value="user">User</option><option value="admin">Admin</option></select></div>
+        <div style={{marginBottom:10}}><label style={lbl}>Scope Level</label><select style={inp} value={uf.scope_level} onChange={e=>setUF({...uf,scope_level:e.target.value,scope_branch:e.target.value==="branch"?uf.scope_branch:""})}><option value="org">Org (full company)</option><option value="branch">Branch (one branch only)</option><option value="site">Site (assigned accounts only)</option></select></div>
+        {uf.scope_level==="branch"&&<div style={{marginBottom:10}}><label style={lbl}>Branch</label><select style={inp} value={uf.scope_branch} onChange={e=>setUF({...uf,scope_branch:e.target.value})}><option value="">Select...</option>{(stg.branches||[]).map(b=><option key={b} value={b}>{b}</option>)}</select></div>}
+        {uf.role!=="admin"&&<div style={{marginBottom:14}}><label style={lbl}>View Access</label><div style={{display:"flex",gap:10,flexWrap:"wrap",padding:"6px 0"}}>{[["dashboard","Dashboard"],["command","Command"],["analytics","Analytics"],["notifications","Notifications"]].map(([k,l])=><label key={k} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:uf.view_permissions[k]?C.t:C.m,cursor:"pointer"}}><input type="checkbox" checked={uf.view_permissions[k]} onChange={e=>setUF({...uf,view_permissions:{...uf.view_permissions,[k]:e.target.checked}})}/>{l}</label>)}</div></div>}
         <div style={{display:"flex",gap:8}}><button style={bt("p")} onClick={createUser}>CREATE</button><button style={bt("g")} onClick={()=>setSUF(false)}>CANCEL</button></div>
         <div style={{textAlign:"center",marginTop:14,fontSize:9,color:C.d,letterSpacing:2}}>BUILT FOR THE J3S OFFICE</div>
       </div>
@@ -418,6 +453,7 @@ export default function App(){
         <div><label style={lbl}>Health</label><select style={inp} value={fd.health} onChange={e=>setFD({...fd,health:e.target.value})}>{stg.healthStatuses.map(h=><option key={h.key} value={h.key}>{h.key}</option>)}</select></div>
         <div><label style={lbl}>Pending ({stg.currency.symbol})</label><input style={inp} type="number" value={fd.pending_amount} onChange={e=>setFD({...fd,pending_amount:Number(e.target.value)})}/></div>
         <div><label style={lbl}>Branch</label><select style={inp} value={fd.branch||""} onChange={e=>setFD({...fd,branch:e.target.value})}>{(stg.branches||[]).map(b=><option key={b}>{b}</option>)}</select></div>
+        <div><label style={lbl}>Field Officer Responsible</label><select style={inp} value={fd.field_officer_id||""} onChange={e=>setFD({...fd,field_officer_id:e.target.value||null})}><option value="">— None —</option>{users.filter(u=>u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name||u.username} {u.scope_level==="site"?"(site)":u.scope_level==="branch"?`(${u.scope_branch||"branch"})`:""}</option>)}</select></div>
       </div>
       <div style={{marginTop:14}}><label style={{...lbl,marginBottom:8}}>👥 STAFF BREAKDOWN</label>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:8}}>
@@ -432,7 +468,6 @@ export default function App(){
 
   // ═══ COMMAND PANELS (4-Panel Dashboard) ═══
   const CommandPanels=({accs,users,currentUser,isAdmin,stg,loadAll,onNotifChange})=>{
-    // ── Supabase helpers for new tables ──
     const cGet=async(t,p="")=>get(t,p);
     const cPost=async(t,d)=>post(t,d);
     const cPatch=async(t,m,d)=>patch(t,m,d);
@@ -530,7 +565,6 @@ export default function App(){
         setTodos(visible.map(t=>(["pending","in_progress"].includes(t.status)&&t.due_date&&new Date(t.due_date)<now)?{...t,status:"overdue"}:t))}catch(e){}setLd(false)},[]);
       useEffect(()=>{load()},[load]);
 
-      // ─── Notification helper ───
       const notify=async(todo,eventType,message,remark)=>{
         if(!todo)return;
         const recipients=new Set();
@@ -590,7 +624,6 @@ export default function App(){
       const confirmDelete=async()=>{
         if(!remarkText.trim()){alert("Reason for deletion is required");return;}
         const todo=remarkModal.todo;
-        // Send notification BEFORE deleting the todo
         await notify(todo,"deleted",`Task deleted: ${todo.title}`,remarkText.trim());
         await cRm("todos",`?id=eq.${todo.id}`);
         setRemarkModal(null);setRemarkText("");load();
@@ -899,7 +932,6 @@ export default function App(){
       </div>;
     }
 
-    // ═══ RENDER 2x2 GRID ═══
     return<>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,minHeight:"calc(100vh - 120px)"}}>
         <UpdPanel/><TodoPanel/><CollPanel/><PipePanel/>
@@ -916,7 +948,7 @@ export default function App(){
       <div><div style={{fontSize:16,fontWeight:700,color:C.g,letterSpacing:3}}>{stg.companyName} ACCOUNTS</div><div style={{fontSize:9,color:C.d,letterSpacing:2}}>BUILT FOR THE <span style={{color:C.g}}>J3S OFFICE</span></div></div>
       <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
         {syncing&&<span style={{fontSize:10,color:C.yl,animation:"pulse 1s infinite"}}>SYNCING</span>}
-        {[["dashboard","DASHBOARD"],["command","COMMAND"],["analytics","ANALYTICS"],["notifications",`🔔 NOTIFICATIONS${unreadNotifCount>0?` (${unreadNotifCount})`:""}`],...(isA?[["users","👤 USERS"],["settings","⚙ SETTINGS"]]:[])].map(([k,l])=>{
+        {[["dashboard","DASHBOARD"],["command","COMMAND"],["analytics","ANALYTICS"],["notifications",`🔔 NOTIFICATIONS${unreadNotifCount>0?` (${unreadNotifCount})`:""}`],...(isA?[["users","👤 USERS"],["settings","⚙ SETTINGS"]]:[])].filter(([k])=>["users","settings"].includes(k)?isA:canSee(k)).map(([k,l])=>{
           const active=view===k||(view==="detail"&&k==="dashboard");
           const hasUnread=k==="notifications"&&unreadNotifCount>0;
           return<button key={k} style={{...nb(active),position:"relative",...(hasUnread&&!active?{borderColor:C.rd,color:C.rd}:{})}} onClick={()=>{setView(k);setSelId(null)}}>{l}</button>
@@ -930,7 +962,7 @@ export default function App(){
     </div>
     <div style={{padding:"18px 20px"}}>
      {view==="dashboard"&&Dash()}
-{view==="command"&&<CommandPanels accs={accs} users={users} currentUser={user} isAdmin={isA} stg={stg} loadAll={loadAll} onNotifChange={loadNotifs}/>}
+{view==="command"&&<CommandPanels accs={scopedAccs} users={users} currentUser={user} isAdmin={isA} stg={stg} loadAll={loadAll} onNotifChange={loadNotifs}/>}
 {view==="detail"&&Det()}
 {view==="analytics"&&Analytics()}
 {view==="notifications"&&Notif()}
