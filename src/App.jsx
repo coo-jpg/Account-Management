@@ -285,7 +285,7 @@ export default function App(){
       <button style={sb("s")} onClick={loadAll}>🔄</button>
       {isA&&<button style={bt("p")} onClick={()=>{setFD(mkE());setEM(false);setSF(true)}}>+ NEW</button>}
     </div>
-    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{["Client","Code","Branch","Field Officer","Health","Contract","Staff","Pending","Renewal","Comp"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>
+    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{["Client","Code","State","Field Officer","Health","Contract","Staff","Pending","Renewal","Comp"].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead><tbody>
       {fil.map(a=>{const d=dTo(a.contract_end),sr=tS(a.staff_breakdown,"required"),sd=tS(a.staff_breakdown,"deployed"),ok=Object.values(a.compliance_status||{}).every(Boolean);
         return<tr key={a.id} style={{cursor:"pointer"}} onClick={()=>{setSelId(a.id);setView("detail")}} onMouseEnter={e=>e.currentTarget.style.background="#1a2418"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
           <td style={td}><div style={{fontWeight:700}}>{a.client}</div><div style={{fontSize:10,color:C.d}}>{a.account_id} · {a.location}</div></td>
