@@ -273,10 +273,11 @@ export default function App(){
     if(!task)return;
     setSyncing(true);
     // Post the update entry
-    await post("task_updates",{
+   await post("task_updates",{
       todo_id:taskId,
       update_text:updateText.trim(),
-      status_change:updateStatus||null,
+      old_status:task.status,
+      new_status:updateStatus||null,
       author_id:user?.id||null,
       author_name:user?.full_name||user?.username||"Unknown"
     });
@@ -1194,15 +1195,15 @@ export default function App(){
             {selUpdates.length===0?<div style={{fontSize:11,color:C.d,fontStyle:"italic",marginBottom:14}}>No updates yet. {canPostUpdate?"Post the first update below.":""}</div>:
             <div style={{marginBottom:14,position:"relative",paddingLeft:22}}>
               <div style={{position:"absolute",left:7,top:6,bottom:6,width:2,background:C.bd}}/>
-              {selUpdates.map((u,i)=>{
-                const isStatusChange=!!u.status_change;
+            {selUpdates.map((u,i)=>{
+                const isStatusChange=!!u.new_status;
                 return<div key={u.id} style={{position:"relative",marginBottom:14,paddingBottom:8}}>
-                  <div style={{position:"absolute",left:-20,top:4,width:12,height:12,borderRadius:"50%",background:isStatusChange?stC(u.status_change):C.g,border:`2px solid ${C.bg}`}}/>
-                  <div style={{background:C.bg,padding:"10px 12px",border:`1px solid ${C.bd}`,borderLeft:`3px solid ${isStatusChange?stC(u.status_change):C.g}`}}>
+                  <div style={{position:"absolute",left:-20,top:4,width:12,height:12,borderRadius:"50%",background:isStatusChange?stC(u.new_status):C.g,border:`2px solid ${C.bg}`}}/>
+                  <div style={{background:C.bg,padding:"10px 12px",border:`1px solid ${C.bd}`,borderLeft:`3px solid ${isStatusChange?stC(u.new_status):C.g}`}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:6}}>
                       <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
                         <span style={{fontSize:11,color:C.g,fontWeight:700}}>👤 {u.author_name||"Unknown"}</span>
-                        {isStatusChange&&<span style={pill(stC(u.status_change))}>→ {u.status_change.replace("_"," ")}</span>}
+                        {isStatusChange&&<span style={pill(stC(u.new_status))}>{u.old_status?`${u.old_status.replace("_"," ")} → ${u.new_status.replace("_"," ")}`:`→ ${u.new_status.replace("_"," ")}`}</span>}
                       </div>
                       <div style={{display:"flex",gap:6,alignItems:"center"}}>
                         <span style={{fontSize:9,color:C.d,fontFamily:F}}>{fmtTs(u.created_at)}</span>
