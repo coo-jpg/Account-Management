@@ -96,12 +96,12 @@ export default function App(){
   const[toast,setToast]=useState(null);
   const[users,setUsers]=useState([]);
   const[showUF,setSUF]=useState(false);
-  const[pwModal,setPwModal]=useState({open:false,user:null});
-const[pwVal,setPwVal]=useState("");
-const[pwVal2,setPwVal2]=useState("");
-const[pwErr,setPwErr]=useState("");
-const[delUserModal,setDelUserModal]=useState({open:false,user:null});
   const[uf,setUF]=useState({username:"",password:"",full_name:"",role:"user",scope_level:"org",scope_branch:"",view_permissions:{dashboard:true,command:true,analytics:true,notifications:true}});
+  const[pwModal,setPwModal]=useState({open:false,user:null});
+  const[pwVal,setPwVal]=useState("");
+  const[pwVal2,setPwVal2]=useState("");
+  const[pwErr,setPwErr]=useState("");
+  const[delUserModal,setDelUserModal]=useState({open:false,user:null});
   const[notifs,setNotifs]=useState([]);
   const[notifTick,setNotifTick]=useState(0);
   const[allTodos,setAllTodos]=useState([]);
@@ -118,14 +118,15 @@ const[delUserModal,setDelUserModal]=useState({open:false,user:null});
   const[updateStatus,setUpdateStatus]=useState("");
 
   const tw = m => {setToast(m);setTimeout(()=>setToast(null),2500)};
-  const isA = user?.role==="admin";
+  const isSA = user?.role==="superadmin";
+  const isA = user?.role==="admin"||isSA;
 
   // ─── SCOPING & PERMISSIONS ───
   const uScope = user?.scope_level||"org";
   const uBranch = user?.scope_branch||"";
   const vPerms = user?.view_permissions||{dashboard:true,command:true,analytics:true,notifications:true};
   const canSee = v => isA||vPerms[v]!==false;
-  const inScope = a => {if(isA||uScope==="org")return true;if(uScope==="branch")return a.branch===uBranch;if(uScope==="site")return a.field_officer_id===user.id;return false};
+  const inScope = a => {if(isA||uScope==="org")return true;if(uScope==="branch")return a.state===uBranch;if(uScope==="site")return a.field_officer_id===user.id;return false};
 
   // ─── AUTH via RPC (server-side bcrypt) ───
   const doLogin = async () => {
@@ -225,6 +226,8 @@ const[delUserModal,setDelUserModal]=useState({open:false,user:null});
   const changeRole=async(id,role)=>{await patch("acm_users",`?id=eq.${id}`,{role});await loadUsers();tw("Role updated")};
   const updateUserField=async(id,data)=>{await patch("acm_users",`?id=eq.${id}`,data);await loadUsers();tw("Updated")};
   const vpToggle=async(u,key)=>{const vp={...(u.view_permissions||{dashboard:true,command:true,analytics:true,notifications:true})};vp[key]=!vp[key];await updateUserField(u.id,{view_permissions:vp})};
+  const resetUserPassword=async(userId,newPassword)=>{const r=await rpc("acm_reset_password",{p_user_id:userId,p_new_password:newPassword});return r===true||r};
+  const hardDeleteUser=async(userId)=>{const r=await rpc("acm_delete_user",{p_user_id:userId});if(r){await loadUsers();return true}return false};
 
   // ─── TASK CRUD ───
   const notifyTaskEvent=async(task,eventType,message,remark)=>{
@@ -466,13 +469,13 @@ const[delUserModal,setDelUserModal]=useState({open:false,user:null});
         return<tr key={u.id}>
           <td style={td}><span style={{fontWeight:700}}>{u.username}</span></td>
           <td style={td}>{u.full_name||"—"}</td>
-          <td style={td}><span style={pill(u.role==="admin"?C.g:C.bl)}>{u.role.toUpperCase()}</span></td>
+          <td style={td}><span style={pill(u.role==="superadmin"?"#a855f7":u.role==="admin"?C.g:C.bl)}>{u.role.toUpperCase()}</span></td>
           <td style={td}>{isSelf?<span style={pill(C.g)}>{(u.scope_level||"org").toUpperCase()}</span>:<select style={{...inp,width:90,padding:"2px 6px",fontSize:10}} value={u.scope_level||"org"} onChange={e=>updateUserField(u.id,{scope_level:e.target.value,...(e.target.value!=="branch"?{scope_branch:null}:{})})}><option value="org">Org</option><option value="branch">Branch</option><option value="site">Site</option></select>}</td>
           <td style={td}>{u.scope_level==="branch"?(isSelf?<span style={{color:C.t}}>{u.scope_branch||"—"}</span>:<select style={{...inp,width:110,padding:"2px 6px",fontSize:10}} value={u.scope_branch||""} onChange={e=>updateUserField(u.id,{scope_branch:e.target.value})}><option value="">—</option>{(stg.branches||[]).map(b=><option key={b} value={b}>{b}</option>)}</select>):<span style={{color:C.d}}>—</span>}</td>
-          <td style={td}>{u.role==="admin"?<span style={{color:C.d,fontSize:10}}>ALL (admin)</span>:<div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{[["dashboard","DASH"],["command","CMD"],["analytics","ANL"],["notifications","NOTIF"]].map(([k,l])=><label key={k} style={{display:"flex",alignItems:"center",gap:3,fontSize:9,cursor:isSelf?"default":"pointer",color:vp[k]?C.gn:C.d}}><input type="checkbox" checked={vp[k]!==false} disabled={isSelf} onChange={()=>vpToggle(u,k)} style={{margin:0,cursor:isSelf?"default":"pointer"}}/>{l}</label>)}</div>}</td>
+          <td style={td}>{u.role==="admin"||u.role==="superadmin"?<span style={{color:C.d,fontSize:10}}>ALL ({u.role})</span>:<div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{[["dashboard","DASH"],["command","CMD"],["analytics","ANL"],["notifications","NOTIF"]].map(([k,l])=><label key={k} style={{display:"flex",alignItems:"center",gap:3,fontSize:9,cursor:isSelf?"default":"pointer",color:vp[k]?C.gn:C.d}}><input type="checkbox" checked={vp[k]!==false} disabled={isSelf} onChange={()=>vpToggle(u,k)} style={{margin:0,cursor:isSelf?"default":"pointer"}}/>{l}</label>)}</div>}</td>
           <td style={td}><span style={dot(u.is_active?C.gn:C.rd)}/>{u.is_active?"Active":"Off"}</td>
           <td style={{...td,fontSize:11,color:C.m}}>{u.last_login?$d(u.last_login):"Never"}</td>
-          <td style={td}>{!isSelf&&<div style={{display:"flex",gap:6,flexWrap:"wrap"}}> {isS&&<button style={{...sb("s"),color:C.bl,border:`1px solid ${C.bl}44`}} onClick={()=>setPwModal({open:true,user:u})}>🔑 RESET PW</button>} {isS&&<button style={sb("d")} onClick={()=>setDelUserModal({open:true,user:u})}>🗑 DELETE</button>}<button style={sb(u.is_active?"d":"s")} onClick={()=>toggleUser(u.id,u.is_active)}>{u.is_active?"DISABLE":"ENABLE"}</button><select style={{...inp,width:80,padding:"2px 6px",fontSize:10}} value={u.role} onChange={e=>changeRole(u.id,e.target.value)}><option value="admin">Admin</option><option value="user">User</option></select></div>}</td>
+          <td style={td}>{!isSelf&&<div style={{display:"flex",gap:4,flexWrap:"wrap"}}><button style={{...sb("s"),color:C.bl,borderColor:`${C.bl}66`}} onClick={()=>{setPwModal({open:true,user:u});setPwVal("");setPwVal2("");setPwErr("")}}>🔑 PW</button><button style={sb("d")} onClick={()=>setDelUserModal({open:true,user:u})}>🗑 DEL</button><button style={sb(u.is_active?"d":"s")} onClick={()=>toggleUser(u.id,u.is_active)}>{u.is_active?"OFF":"ON"}</button><select style={{...inp,width:90,padding:"2px 6px",fontSize:10}} value={u.role} onChange={e=>changeRole(u.id,e.target.value)}><option value="superadmin">SuperAdmin</option><option value="admin">Admin</option><option value="user">User</option></select></div>}</td>
         </tr>})}
     </tbody></table></div>
     {showUF&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setSUF(false)}>
@@ -481,10 +484,10 @@ const[delUserModal,setDelUserModal]=useState({open:false,user:null});
         <div style={{marginBottom:10}}><label style={lbl}>Username</label><input style={inp} value={uf.username} onChange={e=>setUF({...uf,username:e.target.value})}/></div>
         <div style={{marginBottom:10}}><label style={lbl}>Password</label><input style={inp} type="password" value={uf.password} onChange={e=>setUF({...uf,password:e.target.value})}/></div>
         <div style={{marginBottom:10}}><label style={lbl}>Full Name</label><input style={inp} value={uf.full_name} onChange={e=>setUF({...uf,full_name:e.target.value})}/></div>
-        <div style={{marginBottom:10}}><label style={lbl}>Role</label><select style={inp} value={uf.role} onChange={e=>setUF({...uf,role:e.target.value})}><option value="user">User</option><option value="admin">Admin</option></select></div>
+        <div style={{marginBottom:10}}><label style={lbl}>Role</label><select style={inp} value={uf.role} onChange={e=>setUF({...uf,role:e.target.value})}><option value="user">User</option><option value="admin">Admin</option><option value="superadmin">Super Admin</option></select></div>
         <div style={{marginBottom:10}}><label style={lbl}>Scope Level</label><select style={inp} value={uf.scope_level} onChange={e=>setUF({...uf,scope_level:e.target.value,scope_branch:e.target.value==="branch"?uf.scope_branch:""})}><option value="org">Org (full company)</option><option value="branch">Branch (one branch only)</option><option value="site">Site (assigned accounts only)</option></select></div>
         {uf.scope_level==="branch"&&<div style={{marginBottom:10}}><label style={lbl}>Branch</label><select style={inp} value={uf.scope_branch} onChange={e=>setUF({...uf,scope_branch:e.target.value})}><option value="">Select...</option>{(stg.branches||[]).map(b=><option key={b} value={b}>{b}</option>)}</select></div>}
-        {uf.role!=="admin"&&<div style={{marginBottom:14}}><label style={lbl}>View Access</label><div style={{display:"flex",gap:10,flexWrap:"wrap",padding:"6px 0"}}>{[["dashboard","Dashboard"],["command","Command"],["analytics","Analytics"],["notifications","Notifications"]].map(([k,l])=><label key={k} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:uf.view_permissions[k]?C.t:C.m,cursor:"pointer"}}><input type="checkbox" checked={uf.view_permissions[k]} onChange={e=>setUF({...uf,view_permissions:{...uf.view_permissions,[k]:e.target.checked}})}/>{l}</label>)}</div></div>}
+        {uf.role==="user"&&<div style={{marginBottom:14}}><label style={lbl}>View Access</label><div style={{display:"flex",gap:10,flexWrap:"wrap",padding:"6px 0"}}>{[["dashboard","Dashboard"],["command","Command"],["analytics","Analytics"],["notifications","Notifications"]].map(([k,l])=><label key={k} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:uf.view_permissions[k]?C.t:C.m,cursor:"pointer"}}><input type="checkbox" checked={uf.view_permissions[k]} onChange={e=>setUF({...uf,view_permissions:{...uf.view_permissions,[k]:e.target.checked}})}/>{l}</label>)}</div></div>}
         <div style={{display:"flex",gap:8}}><button style={bt("p")} onClick={createUser}>CREATE</button><button style={bt("g")} onClick={()=>setSUF(false)}>CANCEL</button></div>
         <div style={{textAlign:"center",marginTop:14,fontSize:9,color:C.d,letterSpacing:2}}>BUILT FOR THE J3S OFFICE</div>
       </div>
@@ -1272,7 +1275,7 @@ const[delUserModal,setDelUserModal]=useState({open:false,user:null});
       <div><div style={{fontSize:16,fontWeight:700,color:C.g,letterSpacing:3}}>{stg.companyName} ACCOUNTS</div><div style={{fontSize:9,color:C.d,letterSpacing:2}}>BUILT FOR THE <span style={{color:C.g}}>J3S OFFICE</span></div></div>
       <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
         {syncing&&<span style={{fontSize:10,color:C.yl,animation:"pulse 1s infinite"}}>SYNCING</span>}
-        {[["dashboard","DASHBOARD"],["tasks","📋 TASKS"],["command","COMMAND"],["analytics","ANALYTICS"],["notifications",`🔔 NOTIFICATIONS${unreadNotifCount>0?` (${unreadNotifCount})`:""}`],...(isA?[["users","👤 USERS"],["settings","⚙ SETTINGS"]]:[])].filter(([k])=>["users","settings"].includes(k)?isA:k==="tasks"?true:canSee(k)).map(([k,l])=>{
+        {[["dashboard","DASHBOARD"],["tasks","📋 TASKS"],["command","COMMAND"],["analytics","ANALYTICS"],["notifications",`🔔 NOTIFICATIONS${unreadNotifCount>0?` (${unreadNotifCount})`:""}`],...(isSA?[["users","👤 USERS"],["settings","⚙ SETTINGS"]]:[])].filter(([k])=>["users","settings"].includes(k)?isSA:k==="tasks"?true:canSee(k)).map(([k,l])=>{
           const active=view===k||(view==="detail"&&k==="dashboard");
           const hasUnread=k==="notifications"&&unreadNotifCount>0;
           return<button key={k} style={{...nb(active),position:"relative",...(hasUnread&&!active?{borderColor:C.rd,color:C.rd}:{})}} onClick={()=>{setView(k);setSelId(null)}}>{l}</button>
@@ -1291,47 +1294,46 @@ const[delUserModal,setDelUserModal]=useState({open:false,user:null});
 {view==="detail"&&Det()}
 {view==="analytics"&&Analytics()}
 {view==="notifications"&&Notif()}
-{view==="users"&&isA&&Usr()}
-{view==="settings"&&isA&&Stg()}
+{view==="users"&&isSA&&Usr()}
+{view==="settings"&&isSA&&Stg()}
     </div>
     {showFrm&&Frm()}
     {pwModal.open&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>{setPwModal({open:false,user:null});setPwVal("");setPwVal2("");setPwErr("")}}>
-  <div style={{background:C.dk,border:`2px solid ${C.bl}`,padding:24,width:360,borderRadius:8,fontFamily:F}} onClick={e=>e.stopPropagation()}>
-    <div style={{fontSize:11,color:C.bl,letterSpacing:2,marginBottom:14,paddingBottom:8,borderBottom:`1px solid ${C.border}`}}>🔑 RESET PASSWORD</div>
-    <div style={{fontSize:11,color:C.m,marginBottom:14}}>User: <span style={{color:C.t,fontWeight:700}}>{pwModal.user?.full_name||pwModal.user?.username}</span></div>
-    <div style={{marginBottom:10}}><div style={{fontSize:10,color:C.m,letterSpacing:1,marginBottom:4}}>NEW PASSWORD *</div><input style={{...inp,marginBottom:0}} type="password" value={pwVal} onChange={e=>setPwVal(e.target.value)} placeholder="Enter new password" autoFocus/></div>
-    <div style={{marginBottom:10}}><div style={{fontSize:10,color:C.m,letterSpacing:1,marginBottom:4}}>CONFIRM PASSWORD *</div><input style={{...inp,marginBottom:0}} type="password" value={pwVal2} onChange={e=>setPwVal2(e.target.value)} placeholder="Confirm new password"/></div>
-    {pwErr&&<div style={{color:C.rd,fontSize:11,marginBottom:10}}>{pwErr}</div>}
-    <div style={{display:"flex",gap:8,marginTop:14}}>
-      <button style={bt("p")} onClick={async()=>{
-        if(!pwVal.trim()){setPwErr("Password required");return}
-        if(pwVal!==pwVal2){setPwErr("Passwords do not match");return}
-        if(pwVal.length<6){setPwErr("Min 6 characters");return}
-        setPwErr("");
-        const r=await rpc("acm_reset_password",{p_user_id:pwModal.user.id,p_new_password:pwVal});
-        if(r){tw("Password reset successfully");setPwModal({open:false,user:null});setPwVal("");setPwVal2("")}
-        else tw("Reset failed");
-      }}>CONFIRM RESET</button>
-      <button style={bt("g")} onClick={()=>{setPwModal({open:false,user:null});setPwVal("");setPwVal2("");setPwErr("")}}>CANCEL</button>
-    </div>
-  </div>
-</div>}
-
-{delUserModal.open&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setDelUserModal({open:false,user:null})}>
-  <div style={{background:C.dk,border:`2px solid ${C.rd}`,padding:24,width:360,borderRadius:8,fontFamily:F}} onClick={e=>e.stopPropagation()}>
-    <div style={{fontSize:11,color:C.rd,letterSpacing:2,marginBottom:14,paddingBottom:8,borderBottom:`1px solid ${C.border}`}}>⚠ DELETE USER</div>
-    <div style={{fontSize:12,color:C.t,marginBottom:6}}>Permanently delete <span style={{color:C.rd,fontWeight:700}}>{delUserModal.user?.full_name||delUserModal.user?.username}</span>?</div>
-    <div style={{fontSize:11,color:C.m,marginBottom:18}}>This cannot be undone. All their task assignments and notifications will be unlinked.</div>
-    <div style={{display:"flex",gap:8}}>
-      <button style={bt("d")} onClick={async()=>{
-        const r=await rpc("acm_delete_user",{p_user_id:delUserModal.user.id});
-        if(r){await loadUsers();setDelUserModal({open:false,user:null});tw("User deleted")}
-        else tw("Delete failed");
-      }}>CONFIRM DELETE</button>
-      <button style={bt("g")} onClick={()=>setDelUserModal({open:false,user:null})}>CANCEL</button>
-    </div>
-  </div>
-</div>}
+      <div style={{background:C.dk,border:`2px solid ${C.bl}`,padding:24,width:360,fontFamily:F}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontSize:11,color:C.bl,letterSpacing:2,marginBottom:14,paddingBottom:8,borderBottom:`1px solid ${C.bd}`,fontWeight:700}}>🔑 RESET PASSWORD</div>
+        <div style={{fontSize:11,color:C.m,marginBottom:14}}>User: <span style={{color:C.t,fontWeight:700}}>{pwModal.user?.full_name||pwModal.user?.username}</span></div>
+        <div style={{marginBottom:10}}><label style={lbl}>New Password *</label><input style={inp} type="password" value={pwVal} onChange={e=>setPwVal(e.target.value)} placeholder="Enter new password" autoFocus/></div>
+        <div style={{marginBottom:10}}><label style={lbl}>Confirm Password *</label><input style={inp} type="password" value={pwVal2} onChange={e=>setPwVal2(e.target.value)} placeholder="Confirm new password"/></div>
+        {pwErr&&<div style={{color:C.rd,fontSize:11,marginBottom:10}}>{pwErr}</div>}
+        <div style={{display:"flex",gap:8,marginTop:14}}>
+          <button style={bt("p")} onClick={async()=>{
+            if(!pwVal.trim()){setPwErr("Password required");return}
+            if(pwVal!==pwVal2){setPwErr("Passwords do not match");return}
+            if(pwVal.length<6){setPwErr("Minimum 6 characters");return}
+            setPwErr("");
+            const ok=await resetUserPassword(pwModal.user.id,pwVal);
+            if(ok){tw("Password reset");setPwModal({open:false,user:null});setPwVal("");setPwVal2("")}
+            else setPwErr("Reset failed — check connection");
+          }}>CONFIRM</button>
+          <button style={bt("g")} onClick={()=>{setPwModal({open:false,user:null});setPwVal("");setPwVal2("");setPwErr("")}}>CANCEL</button>
+        </div>
+      </div>
+    </div>}
+    {delUserModal.open&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setDelUserModal({open:false,user:null})}>
+      <div style={{background:C.dk,border:`2px solid ${C.rd}`,padding:24,width:380,fontFamily:F}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontSize:11,color:C.rd,letterSpacing:2,marginBottom:14,paddingBottom:8,borderBottom:`1px solid ${C.bd}`,fontWeight:700}}>⚠ DELETE USER — PERMANENT</div>
+        <div style={{fontSize:12,color:C.t,marginBottom:6}}>Permanently delete <span style={{color:C.rd,fontWeight:700}}>{delUserModal.user?.full_name||delUserModal.user?.username}</span>?</div>
+        <div style={{fontSize:11,color:C.m,marginBottom:18,lineHeight:1.5}}>This cannot be undone. All their task assignments will be unlinked, account field officer assignments will be cleared, and their notifications will be deleted.</div>
+        <div style={{display:"flex",gap:8}}>
+          <button style={bt("d")} onClick={async()=>{
+            const ok=await hardDeleteUser(delUserModal.user.id);
+            if(ok){setDelUserModal({open:false,user:null});tw("User deleted")}
+            else tw("Delete failed");
+          }}>CONFIRM DELETE</button>
+          <button style={bt("g")} onClick={()=>setDelUserModal({open:false,user:null})}>CANCEL</button>
+        </div>
+      </div>
+    </div>}
     {toast&&<div style={{position:"fixed",bottom:20,right:20,background:C.g,color:C.bg,padding:"8px 18px",fontSize:12,fontWeight:700,letterSpacing:1,fontFamily:F,zIndex:300,borderRadius:2}}>{toast}</div>}
   </div>;
 }
