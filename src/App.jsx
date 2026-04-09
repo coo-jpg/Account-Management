@@ -138,7 +138,7 @@ export default function App(){
   const uBranch = user?.scope_branch||"";
   const vPerms = user?.view_permissions||{dashboard:true,command:true,analytics:true,notifications:true};
   const canSee = v => isA||vPerms[v]!==false;
-  const inScope = a => {if(isA||uScope==="org")return true;if(uScope==="branch")return a.state===uBranch;if(uScope==="site")return a.field_officer_id===user.id;return false};
+  const inScope = a => {if(isSA||uScope==="org")return true;if(uScope==="branch")return a.branch===uBranch;if(uScope==="site")return a.field_officer_id===user.id;return false};
 
   // ─── AUTH via RPC (server-side bcrypt) ───
   const doLogin = async () => {
