@@ -5,19 +5,9 @@ const SB = "https://iqccddabidfcrsbdehiq.supabase.co";
 const SK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlxY2NkZGFiaWRmY3JzYmRlaGlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwODQyMDQsImV4cCI6MjA4NzY2MDIwNH0.tKb-l9TnlSDVsG7zHUJTdd5kt5vWCYKtvQYwVjz0xos";
 const H = { apikey: SK, Authorization: `Bearer ${SK}`, "Content-Type": "application/json" };
 const rpc = async (fn, params) => {
-  const r = await fetch(`${SB}/rest/v1/rpc/${fn}`, {
-    method: "POST",
-    headers: H,
-    body: JSON.stringify(params)
-  });
-
+  const r = await fetch(`${SB}/rest/v1/rpc/${fn}`, { method: "POST", headers: H, body: JSON.stringify(params) });
   const data = await r.json().catch(() => null);
-
-  if (!r.ok) {
-    console.error("RPC ERROR:", data);
-    throw new Error(data?.message || "RPC failed");
-  }
-
+  if (!r.ok) { console.error("RPC ERROR:", data); throw new Error(data?.message || "RPC failed"); }
   return data;
 };
 const get = async (t, p = "") => { try { const r = await fetch(`${SB}/rest/v1/${t}${p}`, { headers: { ...H, Prefer: "return=representation" } }); return r.ok ? r.json() : [] } catch { return [] } };
@@ -74,13 +64,178 @@ const dr = {display:"flex",justifyContent:"space-between",padding:"5px 0",border
 
 const J3S = () => <div style={{textAlign:"center",padding:"14px 0",borderTop:`1px solid ${C.bd}`,marginTop:24,fontSize:10,letterSpacing:3,color:C.d}}>BUILT FOR THE <span style={{color:C.g,fontWeight:700}}>J3S OFFICE</span></div>;
 
-function PayIn({onRec}){const[a,setA]=useState(""),[r,setR]=useState(""),[n,setN]=useState("");return<div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}><input style={{...inp,flex:1,minWidth:80}} placeholder="Amount" value={a} onChange={e=>setA(e.target.value)} type="number"/><input style={{...inp,width:100}} placeholder="Ref" value={r} onChange={e=>setR(e.target.value)}/><input style={{...inp,width:100}} placeholder="Note" value={n} onChange={e=>setN(e.target.value)}/><button style={bt("p")} onClick={()=>{if(a>0){onRec(Number(a),r,n);setA("");setR("");setN("")}}}>RECORD</button></div>}
+function PayIn({onRec}){
+  const[a,setA]=useState("");
+  const[r,setR]=useState("");
+  const[n,setN]=useState("");
+  return<div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+    <input style={{...inp,flex:1,minWidth:80}} placeholder="Amount" value={a} onChange={e=>setA(e.target.value)} type="number"/>
+    <input style={{...inp,width:100}} placeholder="Ref" value={r} onChange={e=>setR(e.target.value)}/>
+    <input style={{...inp,width:100}} placeholder="Note" value={n} onChange={e=>setN(e.target.value)}/>
+    <button style={bt("p")} onClick={()=>{if(a>0){onRec(Number(a),r,n);setA("");setR("");setN("")}}}>RECORD</button>
+  </div>
+}
 
-function DocUp({docs,onUp,onRm}){const r=useRef();return<div><div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>{docs.map(d=><div key={d.id} style={{background:"#1a2418",border:`1px solid ${C.bd}`,padding:"6px 10px",fontSize:11,display:"flex",alignItems:"center",gap:8}}><span style={{color:C.g,cursor:"pointer"}} onClick={()=>window.open(fileUrl(d.storage_path),"_blank")}>📄 {d.file_name}</span><span style={{color:C.d,fontSize:10}}>{(d.file_size/1024).toFixed(0)}KB</span><span style={{color:C.rd,cursor:"pointer",fontWeight:700}} onClick={()=>onRm(d.id,d.storage_path)}>×</span></div>)}{docs.length===0&&<span style={{color:C.d,fontSize:11}}>No documents</span>}</div><input ref={r} type="file" style={{display:"none"}} onChange={e=>{if(e.target.files[0]){onUp(e.target.files[0]);e.target.value=""}}} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"/><button style={sb("s")} onClick={()=>r.current.click()}>📎 UPLOAD</button></div>}
+function DocUp({docs,onUp,onRm}){
+  const r=useRef();
+  return<div>
+    <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+      {docs.map(d=><div key={d.id} style={{background:"#1a2418",border:`1px solid ${C.bd}`,padding:"6px 10px",fontSize:11,display:"flex",alignItems:"center",gap:8}}>
+        <span style={{color:C.g,cursor:"pointer"}} onClick={()=>window.open(fileUrl(d.storage_path),"_blank")}>📄 {d.file_name}</span>
+        <span style={{color:C.d,fontSize:10}}>{(d.file_size/1024).toFixed(0)}KB</span>
+        <span style={{color:C.rd,cursor:"pointer",fontWeight:700}} onClick={()=>onRm(d.id,d.storage_path)}>×</span>
+      </div>)}
+      {docs.length===0&&<span style={{color:C.d,fontSize:11}}>No documents</span>}
+    </div>
+    <input ref={r} type="file" style={{display:"none"}} onChange={e=>{if(e.target.files[0]){onUp(e.target.files[0]);e.target.value=""}}} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"/>
+    <button style={sb("s")} onClick={()=>r.current.click()}>📎 UPLOAD</button>
+  </div>
+}
 
-function InEd({value,onChange,style:st}){const[ed,setEd]=useState(false),[v,setV]=useState(value),r=useRef();useEffect(()=>{if(ed&&r.current)r.current.focus()},[ed]);if(!ed)return<span style={{...st,cursor:"pointer",borderBottom:`1px dashed ${C.bd}`}} onClick={()=>{setV(value);setEd(true)}}>{value}</span>;return<input ref={r} style={{...inp,...st,width:"auto",minWidth:50}} value={v} onChange={e=>setV(e.target.value)} onBlur={()=>{onChange(v);setEd(false)}} onKeyDown={e=>{if(e.key==="Enter"){onChange(v);setEd(false)}if(e.key==="Escape")setEd(false)}}/>}
+function InEd({value,onChange,style:st}){
+  const[ed,setEd]=useState(false);
+  const[v,setV]=useState(value);
+  const r=useRef();
+  useEffect(()=>{if(ed&&r.current)r.current.focus()},[ed]);
+  if(!ed)return<span style={{...st,cursor:"pointer",borderBottom:`1px dashed ${C.bd}`}} onClick={()=>{setV(value);setEd(true)}}>{value}</span>;
+  return<input ref={r} style={{...inp,...st,width:"auto",minWidth:50}} value={v} onChange={e=>setV(e.target.value)} onBlur={()=>{onChange(v);setEd(false)}} onKeyDown={e=>{if(e.key==="Enter"){onChange(v);setEd(false)}if(e.key==="Escape")setEd(false)}}/>
+}
 
-const mkCSV = (accs,s,users) => {const rl=s.staffRoles.map(r=>r.key),cm=s.complianceItems.map(c=>c.key);const hd=["ID","Code","Client","Location","Type","Status","Health","Value","Billing","Terms","Start","End","Renewal","Pending","FieldOfficer","TotReq","TotDep",...rl.flatMap(r=>[`${r}_R`,`${r}_D`]),...cm.map(c=>`C_${c}`),"Paid","Notes"];const rows=accs.map(a=>[a.account_id,a.account_code||"",`"${a.client}"`,`"${a.location||""}"`,a.service_type,a.status,a.health,a.contract_value,a.billing_cycle,a.payment_terms,a.contract_start,a.contract_end,a.renewal_status||"",a.pending_amount,`"${foName(a.field_officer_id,users)}"`,tS(a.staff_breakdown,"required"),tS(a.staff_breakdown,"deployed"),...rl.flatMap(r=>[a.staff_breakdown?.[r]?.required||0,a.staff_breakdown?.[r]?.deployed||0]),...cm.map(c=>a.compliance_status?.[c]?"Y":"N"),(a._p||[]).reduce((s,p)=>s+Number(p.amount),0),`"${(a.notes||"").replace(/"/g,'""')}"`].join(","));return hd.join(",")+"\n"+rows.join("\n")};
+const mkCSV = (accs,s,users) => {
+  const rl=s.staffRoles.map(r=>r.key),cm=s.complianceItems.map(c=>c.key);
+  const hd=["ID","Code","Client","Location","Type","Status","Health","Value","Billing","Terms","Start","End","Renewal","Pending","FieldOfficer","TotReq","TotDep",...rl.flatMap(r=>[`${r}_R`,`${r}_D`]),...cm.map(c=>`C_${c}`),"Paid","Notes"];
+  const rows=accs.map(a=>[a.account_id,a.account_code||"",`"${a.client}"`,`"${a.location||""}"`,a.service_type,a.status,a.health,a.contract_value,a.billing_cycle,a.payment_terms,a.contract_start,a.contract_end,a.renewal_status||"",a.pending_amount,`"${foName(a.field_officer_id,users)}"`,tS(a.staff_breakdown,"required"),tS(a.staff_breakdown,"deployed"),...rl.flatMap(r=>[a.staff_breakdown?.[r]?.required||0,a.staff_breakdown?.[r]?.deployed||0]),...cm.map(c=>a.compliance_status?.[c]?"Y":"N"),(a._p||[]).reduce((s,p)=>s+Number(p.amount),0),`"${(a.notes||"").replace(/"/g,'""')}"`].join(","));
+  return hd.join(",")+"\n"+rows.join("\n")
+};
+
+// ═══════════════════════════════════════════════
+// FORM MODAL — defined OUTSIDE App so it never remounts on App state change
+// ═══════════════════════════════════════════════
+function AccountFormModal({ fd, setFD, eMode, onSave, onClose, syncing, stg, users }) {
+  if (!fd) return null;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:200,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:20,overflowY:"auto"}} onClick={onClose}>
+      <div style={{background:C.dk,border:`2px solid ${C.g}`,width:"94%",maxWidth:720,padding:22,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontSize:14,fontWeight:700,color:C.g,letterSpacing:2,marginBottom:14}}>{eMode?"EDIT":"NEW"} ACCOUNT</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div><label style={lbl}>Client</label><input style={inp} value={fd.client} onChange={e=>setFD({...fd,client:e.target.value})}/></div>
+          <div><label style={lbl}>Account Code</label><input style={inp} placeholder="e.g. KATH-JH-001" value={fd.account_code||""} onChange={e=>setFD({...fd,account_code:e.target.value})}/></div>
+          <div><label style={lbl}>Location</label><input style={inp} value={fd.location||""} onChange={e=>setFD({...fd,location:e.target.value})}/></div>
+          <div><label style={lbl}>Service Type</label><select style={inp} value={fd.service_type} onChange={e=>setFD({...fd,service_type:e.target.value})}>{stg.serviceTypes.map(t=><option key={t}>{t}</option>)}</select></div>
+          <div><label style={lbl}>Contract Value ({stg.currency.symbol}/yr)</label><input style={inp} type="number" value={fd.contract_value} onChange={e=>setFD({...fd,contract_value:Number(e.target.value)})}/></div>
+          <div><label style={lbl}>Start</label><input style={inp} type="date" value={fd.contract_start||""} onChange={e=>setFD({...fd,contract_start:e.target.value})}/></div>
+          <div><label style={lbl}>End</label><input style={inp} type="date" value={fd.contract_end||""} onChange={e=>setFD({...fd,contract_end:e.target.value})}/></div>
+          <div><label style={lbl}>Billing</label><select style={inp} value={fd.billing_cycle} onChange={e=>setFD({...fd,billing_cycle:e.target.value})}>{stg.billingCycles.map(b=><option key={b}>{b}</option>)}</select></div>
+          <div><label style={lbl}>Terms</label><select style={inp} value={fd.payment_terms} onChange={e=>setFD({...fd,payment_terms:Number(e.target.value)})}>{stg.paymentTermsPresets.map(d=><option key={d} value={d}>{d}d</option>)}</select></div>
+          <div><label style={lbl}>Status</label><select style={inp} value={fd.status} onChange={e=>setFD({...fd,status:e.target.value})}>{stg.accountStatuses.map(s=><option key={s}>{s}</option>)}</select></div>
+          <div><label style={lbl}>Health</label><select style={inp} value={fd.health} onChange={e=>setFD({...fd,health:e.target.value})}>{stg.healthStatuses.map(h=><option key={h.key} value={h.key}>{h.key}</option>)}</select></div>
+          <div><label style={lbl}>Pending ({stg.currency.symbol})</label><input style={inp} type="number" value={fd.pending_amount} onChange={e=>setFD({...fd,pending_amount:Number(e.target.value)})}/></div>
+          <div><label style={lbl}>Branch</label><select style={inp} value={fd.branch||""} onChange={e=>setFD({...fd,branch:e.target.value})}>{(stg.branches||[]).map(b=><option key={b}>{b}</option>)}</select></div>
+          <div><label style={lbl}>Field Officer Responsible</label><select style={inp} value={fd.field_officer_id||""} onChange={e=>setFD({...fd,field_officer_id:e.target.value||null})}><option value="">— None —</option>{users.filter(u=>u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name||u.username} {u.scope_level==="site"?"(site)":u.scope_level==="branch"?`(${u.scope_branch||"branch"})`:""}</option>)}</select></div>
+        </div>
+        <div style={{marginTop:14}}><label style={{...lbl,marginBottom:8}}>👥 STAFF BREAKDOWN</label>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:8}}>
+            {stg.staffRoles.map(r=>{const v=fd.staff_breakdown?.[r.key]||{required:0,deployed:0};return<div key={r.key} style={{background:C.bg,padding:10,border:`1px solid ${C.bd}`}}><div style={{fontSize:10,color:C.g,letterSpacing:1,marginBottom:6}}>{r.label.toUpperCase()}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}><div><label style={{fontSize:9,color:C.d}}>Req</label><input style={inp} type="number" min={0} value={v.required} onChange={e=>setFD({...fd,staff_breakdown:{...fd.staff_breakdown,[r.key]:{...v,required:Number(e.target.value)}}})}/></div><div><label style={{fontSize:9,color:C.d}}>Dep</label><input style={inp} type="number" min={0} value={v.deployed} onChange={e=>setFD({...fd,staff_breakdown:{...fd.staff_breakdown,[r.key]:{...v,deployed:Number(e.target.value)}}})}/></div></div></div>})}
+          </div>
+        </div>
+        <div style={{marginTop:12}}><label style={lbl}>Compliance</label><div style={{display:"flex",gap:14,flexWrap:"wrap",marginTop:4}}>{stg.complianceItems.map(ci=><label key={ci.key} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:C.s,cursor:"pointer"}}><input type="checkbox" checked={fd.compliance_status?.[ci.key]||false} onChange={e=>setFD({...fd,compliance_status:{...fd.compliance_status,[ci.key]:e.target.checked}})}/>{ci.label}</label>)}</div></div>
+        <div style={{marginTop:12}}><label style={lbl}>Notes</label><textarea style={{...inp,height:50,resize:"vertical"}} value={fd.notes||""} onChange={e=>setFD({...fd,notes:e.target.value})}/></div>
+        <div style={{marginTop:12}}><label style={lbl}>Contact</label><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}><input style={inp} placeholder="Name" value={fd.contacts?.[0]?.name||""} onChange={e=>setFD({...fd,contacts:[{...(fd.contacts?.[0]||{}),name:e.target.value}]})}/><input style={inp} placeholder="Phone" value={fd.contacts?.[0]?.phone||""} onChange={e=>setFD({...fd,contacts:[{...(fd.contacts?.[0]||{}),phone:e.target.value}]})}/><input style={inp} placeholder="Role" value={fd.contacts?.[0]?.role||""} onChange={e=>setFD({...fd,contacts:[{...(fd.contacts?.[0]||{}),role:e.target.value}]})}/></div></div>
+        <div style={{display:"flex",gap:8,marginTop:18}}>
+          <button style={bt("p")} onClick={onSave} disabled={syncing}>{syncing?"SAVING...":eMode?"UPDATE":"CREATE"}</button>
+          <button style={bt("g")} onClick={onClose}>CANCEL</button>
+        </div>
+        <div style={{textAlign:"center",marginTop:14,fontSize:9,color:C.d,letterSpacing:2}}>BUILT FOR THE J3S OFFICE</div>
+      </div>
+    </div>
+  );
+}
+
+// ═══ CREATE USER MODAL — outside App ═══
+function CreateUserModal({ uf, setUF, onSave, onClose, stg }) {
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onClose}>
+      <div style={{background:C.dk,border:`2px solid ${C.g}`,padding:24,width:400,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontSize:14,fontWeight:700,color:C.g,letterSpacing:2,marginBottom:16}}>CREATE USER</div>
+        <div style={{marginBottom:10}}><label style={lbl}>Username</label><input style={inp} value={uf.username} onChange={e=>setUF({...uf,username:e.target.value})} autoComplete="off"/></div>
+        <div style={{marginBottom:10}}><label style={lbl}>Password</label><input style={inp} type="password" value={uf.password} onChange={e=>setUF({...uf,password:e.target.value})} autoComplete="new-password"/></div>
+        <div style={{marginBottom:10}}><label style={lbl}>Full Name</label><input style={inp} value={uf.full_name} onChange={e=>setUF({...uf,full_name:e.target.value})}/></div>
+        <div style={{marginBottom:10}}><label style={lbl}>Role</label><select style={inp} value={uf.role} onChange={e=>setUF({...uf,role:e.target.value})}><option value="user">User</option><option value="admin">Admin</option><option value="superadmin">Super Admin</option></select></div>
+        <div style={{marginBottom:10}}><label style={lbl}>Scope Level</label><select style={inp} value={uf.scope_level} onChange={e=>setUF({...uf,scope_level:e.target.value,scope_branch:e.target.value==="branch"?uf.scope_branch:""})}><option value="org">Org (full company)</option><option value="branch">Branch (one branch only)</option><option value="site">Site (assigned accounts only)</option></select></div>
+        {uf.scope_level==="branch"&&<div style={{marginBottom:10}}><label style={lbl}>Branch</label><select style={inp} value={uf.scope_branch} onChange={e=>setUF({...uf,scope_branch:e.target.value})}><option value="">Select...</option>{(stg.branches||[]).map(b=><option key={b} value={b}>{b}</option>)}</select></div>}
+        {uf.role==="user"&&<div style={{marginBottom:14}}><label style={lbl}>View Access</label><div style={{display:"flex",gap:10,flexWrap:"wrap",padding:"6px 0"}}>{[["dashboard","Dashboard"],["command","Command"],["analytics","Analytics"],["notifications","Notifications"]].map(([k,l])=><label key={k} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:uf.view_permissions[k]?C.t:C.m,cursor:"pointer"}}><input type="checkbox" checked={uf.view_permissions[k]} onChange={e=>setUF({...uf,view_permissions:{...uf.view_permissions,[k]:e.target.checked}})}/>{l}</label>)}</div></div>}
+        <div style={{display:"flex",gap:8}}>
+          <button style={bt("p")} onClick={onSave}>CREATE</button>
+          <button style={bt("g")} onClick={onClose}>CANCEL</button>
+        </div>
+        <div style={{textAlign:"center",marginTop:14,fontSize:9,color:C.d,letterSpacing:2}}>BUILT FOR THE J3S OFFICE</div>
+      </div>
+    </div>
+  );
+}
+
+// ═══ TASK FORM MODAL — outside App ═══
+function TaskFormModal({ editTask, taskForm, setTaskForm, onSave, onClose, syncing, users, scopedAccs }) {
+  const defTaskForm = {title:"",description:"",priority:"normal",assigned_to:"",assigned_to_name:"",account_id:"",due_date:"",tags:""};
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:200,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:40,overflowY:"auto"}} onClick={onClose}>
+      <div style={{background:C.dk,border:`2px solid ${C.g}`,padding:22,width:"94%",maxWidth:560,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontSize:14,fontWeight:700,color:C.g,letterSpacing:2,marginBottom:14}}>{editTask?"EDIT":"NEW"} TASK</div>
+        <div style={{marginBottom:10}}><label style={lbl}>Title *</label><input style={inp} value={taskForm.title} onChange={e=>setTaskForm({...taskForm,title:e.target.value})} placeholder="What needs to be done?" autoFocus/></div>
+        <div style={{marginBottom:10}}><label style={lbl}>Description</label><textarea style={{...inp,height:70,resize:"vertical"}} value={taskForm.description} onChange={e=>setTaskForm({...taskForm,description:e.target.value})} placeholder="Details, context, expected outcome..."/></div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+          <div><label style={lbl}>Priority</label><select style={inp} value={taskForm.priority} onChange={e=>setTaskForm({...taskForm,priority:e.target.value})}>{["low","normal","high","critical"].map(p=><option key={p} value={p}>{p.toUpperCase()}</option>)}</select></div>
+          <div><label style={lbl}>Due Date</label><input type="date" style={inp} value={taskForm.due_date} onChange={e=>setTaskForm({...taskForm,due_date:e.target.value})}/></div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+          <div><label style={lbl}>Assign To</label><select style={inp} value={taskForm.assigned_to} onChange={e=>{const uid=e.target.value;const u=users.find(x=>x.id===uid);setTaskForm({...taskForm,assigned_to:uid,assigned_to_name:u?(u.full_name||u.username):"All"})}}><option value="">— All (Everyone) —</option>{users.filter(u=>u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name||u.username}</option>)}</select></div>
+          <div><label style={lbl}>Linked Account</label><select style={inp} value={taskForm.account_id} onChange={e=>setTaskForm({...taskForm,account_id:e.target.value})}><option value="">— None —</option>{scopedAccs.map(a=><option key={a.id} value={a.id}>{a.client}</option>)}</select></div>
+        </div>
+        <div style={{marginBottom:14}}><label style={lbl}>Tags (comma-separated)</label><input style={inp} value={taskForm.tags} onChange={e=>setTaskForm({...taskForm,tags:e.target.value})} placeholder="site-visit, urgent, vendor..."/></div>
+        <div style={{display:"flex",gap:8}}>
+          <button style={bt("p")} onClick={onSave} disabled={syncing}>{syncing?"SAVING...":editTask?"UPDATE":"CREATE"}</button>
+          <button style={bt("g")} onClick={onClose}>CANCEL</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══ PASSWORD RESET MODAL — outside App ═══
+function PwResetModal({ pwModal, pwVal, setPwVal, pwVal2, setPwVal2, pwErr, setPwErr, onConfirm, onClose }) {
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onClose}>
+      <div style={{background:C.dk,border:`2px solid ${C.bl}`,padding:24,width:360,fontFamily:F}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontSize:11,color:C.bl,letterSpacing:2,marginBottom:14,paddingBottom:8,borderBottom:`1px solid ${C.bd}`,fontWeight:700}}>🔑 RESET PASSWORD</div>
+        <div style={{fontSize:11,color:C.m,marginBottom:14}}>User: <span style={{color:C.t,fontWeight:700}}>{pwModal.user?.full_name||pwModal.user?.username}</span></div>
+        <div style={{marginBottom:10}}><label style={lbl}>New Password *</label><input style={inp} type="password" value={pwVal} onChange={e=>setPwVal(e.target.value)} placeholder="Enter new password" autoFocus autoComplete="new-password"/></div>
+        <div style={{marginBottom:10}}><label style={lbl}>Confirm Password *</label><input style={inp} type="password" value={pwVal2} onChange={e=>setPwVal2(e.target.value)} placeholder="Confirm new password" autoComplete="new-password"/></div>
+        {pwErr&&<div style={{color:C.rd,fontSize:11,marginBottom:10}}>{pwErr}</div>}
+        <div style={{display:"flex",gap:8,marginTop:14}}>
+          <button style={bt("p")} onClick={onConfirm}>CONFIRM</button>
+          <button style={bt("g")} onClick={onClose}>CANCEL</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══ DELETE USER MODAL — outside App ═══
+function DelUserModal({ delUserModal, onConfirm, onClose }) {
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onClose}>
+      <div style={{background:C.dk,border:`2px solid ${C.rd}`,padding:24,width:380,fontFamily:F}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontSize:11,color:C.rd,letterSpacing:2,marginBottom:14,paddingBottom:8,borderBottom:`1px solid ${C.bd}`,fontWeight:700}}>⚠ DELETE USER — PERMANENT</div>
+        <div style={{fontSize:12,color:C.t,marginBottom:6}}>Permanently delete <span style={{color:C.rd,fontWeight:700}}>{delUserModal.user?.full_name||delUserModal.user?.username}</span>?</div>
+        <div style={{fontSize:11,color:C.m,marginBottom:18,lineHeight:1.5}}>This cannot be undone. All their task assignments will be unlinked, account field officer assignments will be cleared, and their notifications will be deleted.</div>
+        <div style={{display:"flex",gap:8}}>
+          <button style={bt("d")} onClick={onConfirm}>CONFIRM DELETE</button>
+          <button style={bt("g")} onClick={onClose}>CANCEL</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ═══════════════════════
 // MAIN APP
@@ -108,7 +263,8 @@ export default function App(){
   const[toast,setToast]=useState(null);
   const[users,setUsers]=useState([]);
   const[showUF,setSUF]=useState(false);
-  const[uf,setUF]=useState({username:"",password:"",full_name:"",role:"user",scope_level:"org",scope_branch:"",view_permissions:{dashboard:true,command:true,analytics:true,notifications:true}});
+  const defUF = {username:"",password:"",full_name:"",role:"user",scope_level:"org",scope_branch:"",view_permissions:{dashboard:true,command:true,analytics:true,notifications:true}};
+  const[uf,setUF]=useState(defUF);
   const[pwModal,setPwModal]=useState({open:false,user:null});
   const[pwVal,setPwVal]=useState("");
   const[pwVal2,setPwVal2]=useState("");
@@ -138,9 +294,15 @@ export default function App(){
   const uBranch = user?.scope_branch||"";
   const vPerms = user?.view_permissions||{dashboard:true,command:true,analytics:true,notifications:true};
   const canSee = v => isA||vPerms[v]!==false;
-  const inScope = a => {if(isSA||uScope==="org")return true;if(uScope==="branch")return a.branch===uBranch;if(uScope==="site")return a.field_officer_id===user.id;return false};
+  // FIX: superadmin/org bypass scope; branch users filter by a.branch (not a.state)
+  const inScope = a => {
+    if(isSA||uScope==="org") return true;
+    if(uScope==="branch") return a.branch===uBranch;
+    if(uScope==="site") return a.field_officer_id===user.id;
+    return false;
+  };
 
-  // ─── AUTH via RPC (server-side bcrypt) ───
+  // ─── AUTH ───
   const doLogin = async () => {
     setLding(true);setLE("");
     const res = await rpc("acm_login",{p_username:lU,p_password:lP});
@@ -166,7 +328,7 @@ export default function App(){
 
   const loadUsers=async()=>{const u=await get("acm_users","?order=created_at.asc");setUsers(u)};
 
-  // ─── TASKS & UPDATES ───
+  // ─── TASKS ───
   const loadTasks=useCallback(async()=>{
     const[t,u]=await Promise.all([
       get("todos","?order=created_at.desc&limit=500"),
@@ -187,10 +349,7 @@ export default function App(){
 
   useEffect(()=>{
     if(user){
-      loadAll();
-      loadUsers();
-      loadNotifs();
-      loadTasks();
+      loadAll();loadUsers();loadNotifs();loadTasks();
       rpc("cleanup_old_todo_notifications",{}).catch(()=>{});
       const iv=setInterval(()=>setNotifTick(t=>t+1),45000);
       return ()=>clearInterval(iv);
@@ -220,22 +379,25 @@ export default function App(){
 
   // ─── ACCOUNT CRUD ───
   const mkE=()=>({account_id:"",account_code:"",client:"",location:"",service_type:stg.serviceTypes[0]||"",contract_value:0,billing_cycle:stg.defaultBillingCycle,contract_start:"",contract_end:"",invoice_day:stg.invoiceDayDefault,payment_terms:stg.defaultPaymentTerms,status:stg.defaultStatus,health:stg.defaultHealth,staff_breakdown:Object.fromEntries(stg.staffRoles.map(r=>[r.key,{required:0,deployed:0}])),pending_amount:0,compliance_status:Object.fromEntries(stg.complianceItems.map(c=>[c.key,false])),contacts:[{name:"",phone:"",role:"POC"}],notes:stg.notesTemplate,renewal_status:stg.renewalStatuses?.[0]||"Pending",branch:stg.branches?.[0]||"",rate_revision:0,field_officer_id:null,custom_data:{},_p:[],_d:[]});
-  const saveAcc=async()=>{if(!fd)return;setSyncing(true);
+
+  const saveAcc=async()=>{
+    if(!fd)return;
+    setSyncing(true);
     if(eMode){const{_p,_d,id,created_at,updated_at,...rest}=fd;await patch("accounts",`?id=eq.${fd.id}`,rest)}
     else{const nums=accs.map(a=>parseInt(a.account_id.replace("ACC-",""))||0);const nx=Math.max(0,...nums)+1;const{_p,_d,id,...rest}=fd;await post("accounts",{...rest,account_id:`ACC-${String(nx).padStart(3,"0")}`})}
-    await loadAll();setSF(false);setEM(false);setSyncing(false);tw(eMode?"Updated":"Created")};
+    await loadAll();setSF(false);setEM(false);setSyncing(false);tw(eMode?"Updated":"Created")
+  };
+
   const delAcc=async id=>{setSyncing(true);await rm("accounts",`?id=eq.${id}`);await loadAll();setSelId(null);setView("dashboard");setSyncing(false);tw("Deleted")};
   const updA=async(id,p)=>{await patch("accounts",`?id=eq.${id}`,p);setAccs(prev=>prev.map(a=>a.id===id?{...a,...p}:a))};
   const recPay=async(uid,amt,ref,note)=>{setSyncing(true);await post("account_payments",{account_id:uid,payment_date:new Date().toISOString().split("T")[0],amount:amt,reference:ref,note});const ac=accs.find(a=>a.id===uid);if(ac)await patch("accounts",`?id=eq.${uid}`,{pending_amount:Math.max(0,Number(ac.pending_amount)-amt)});await loadAll();setSyncing(false);tw(`${stg.currency.symbol}${amt.toLocaleString()} recorded`)};
   const upDoc=async(uid,f)=>{if(f.size>5e6){tw("Max 5MB");return}setSyncing(true);const p=`${uid}/${Date.now()}_${f.name}`;const ok=await upFile(p,f);if(ok){await post("account_documents",{account_id:uid,file_name:f.name,file_type:f.type,file_size:f.size,storage_path:p});await loadAll();tw("Uploaded")}else tw("Failed");setSyncing(false)};
   const rmDoc=async(did,sp)=>{setSyncing(true);await rmFile(sp);await rm("account_documents",`?id=eq.${did}`);await loadAll();setSyncing(false);tw("Removed")};
 
-const createUser = async () => {
+  // ─── USER CRUD ───
+  const createUser = async () => {
     try {
-      if (!uf.username || !uf.password) {
-        tw("Username & password required");
-        return;
-      }
+      if (!uf.username || !uf.password) { tw("Username & password required"); return; }
       const res = await rpc("acm_create_user", {
         p_username: uf.username,
         p_password: uf.password,
@@ -249,20 +411,7 @@ const createUser = async () => {
       if (res && res.length > 0) {
         await loadUsers();
         setSUF(false);
-        setUF({
-          username: "",
-          password: "",
-          full_name: "",
-          role: "user",
-          scope_level: "org",
-          scope_branch: "",
-          view_permissions: {
-            dashboard: true,
-            command: true,
-            analytics: true,
-            notifications: true
-          }
-        });
+        setUF(defUF);
         tw("User created");
       } else {
         tw("Creation failed — username may already exist");
@@ -272,6 +421,7 @@ const createUser = async () => {
       tw(err.message || "Error creating user");
     }
   };
+
   const toggleUser=async(id,active)=>{await patch("acm_users",`?id=eq.${id}`,{is_active:!active});await loadUsers();tw(active?"Deactivated":"Activated")};
   const changeRole=async(id,role)=>{await patch("acm_users",`?id=eq.${id}`,{role});await loadUsers();tw("Role updated")};
   const updateUserField=async(id,data)=>{await patch("acm_users",`?id=eq.${id}`,data);await loadUsers();tw("Updated")};
@@ -302,8 +452,7 @@ const createUser = async () => {
       const updated=(res&&res[0])||{...editTask,...bd};
       if(editTask.assigned_to!==bd.assigned_to)await notifyTaskEvent(updated,"reassigned",`Task reassigned to ${bd.assigned_to_name}`);
     }else{
-      bd.notified_at=new Date().toISOString();
-      bd.status="pending";
+      bd.notified_at=new Date().toISOString();bd.status="pending";
       const res=await post("todos",bd);
       const created=res&&res[0];
       if(created)await notifyTaskEvent(created,"assigned",`New task assigned: ${bd.title}`);
@@ -330,15 +479,7 @@ const createUser = async () => {
     const task=allTodos.find(t=>t.id===taskId);
     if(!task)return;
     setSyncing(true);
-    // Post the update entry
-    await post("task_updates",{
-      todo_id:taskId,
-      update_text:updateText.trim(),
-      status_change:updateStatus||null,
-      author_id:user?.id||null,
-      author_name:user?.full_name||user?.username||"Unknown"
-    });
-    // If status changed, update the todo
+    await post("task_updates",{todo_id:taskId,update_text:updateText.trim(),status_change:updateStatus||null,author_id:user?.id||null,author_name:user?.full_name||user?.username||"Unknown"});
     if(updateStatus&&updateStatus!==task.status){
       const patchBody={status:updateStatus,updated_at:new Date().toISOString()};
       if(updateStatus==="completed"){patchBody.completed_at=new Date().toISOString();patchBody.completion_remark=updateText.trim()}
@@ -355,8 +496,7 @@ const createUser = async () => {
   const delTaskUpdate=async(updateId)=>{
     if(!confirm("Delete this update?"))return;
     await rm("task_updates",`?id=eq.${updateId}`);
-    await loadTasks();
-    tw("Update removed");
+    await loadTasks();tw("Update removed");
   };
 
   // ─── DERIVED (scoped) ───
@@ -378,7 +518,6 @@ const createUser = async () => {
   scopedAccs.forEach(a=>{if(Number(a.pending_amount)<=0)return;const lp=a._p?.[0]?.payment_date||a.contract_start;const d=dSn(lp);if(d<=30)ag.c+=Number(a.pending_amount);else if(d<=60)ag.d3+=Number(a.pending_amount);else if(d<=90)ag.d6+=Number(a.pending_amount);else ag.o9+=Number(a.pending_amount)});
   const xCSV=()=>{const c=mkCSV(scopedAccs,stg,users);const b=new Blob([c],{type:"text/csv"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=`bbcss_${new Date().toISOString().split("T")[0]}.csv`;a.click();tw("Exported")};
 
-  // ─── VIEW ACCESS GUARD ───
   useEffect(()=>{
     if(!user)return;
     const needsPerm=["dashboard","command","analytics","notifications"];
@@ -528,40 +667,20 @@ const createUser = async () => {
           <td style={td}>{!isSelf&&<div style={{display:"flex",gap:4,flexWrap:"wrap"}}><button style={{...sb("s"),color:C.bl,borderColor:`${C.bl}66`}} onClick={()=>{setPwModal({open:true,user:u});setPwVal("");setPwVal2("");setPwErr("")}}>🔑 PW</button><button style={sb("d")} onClick={()=>setDelUserModal({open:true,user:u})}>🗑 DEL</button><button style={sb(u.is_active?"d":"s")} onClick={()=>toggleUser(u.id,u.is_active)}>{u.is_active?"OFF":"ON"}</button><select style={{...inp,width:90,padding:"2px 6px",fontSize:10}} value={u.role} onChange={e=>changeRole(u.id,e.target.value)}><option value="superadmin">SuperAdmin</option><option value="admin">Admin</option><option value="user">User</option></select></div>}</td>
         </tr>})}
     </tbody></table></div>
-    {showUF&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setSUF(false)}>
-      <div key="create-user-modal" style={{background:C.dk,border:`2px solid ${C.g}`,padding:24,width:400,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontSize:14,fontWeight:700,color:C.g,letterSpacing:2,marginBottom:16}}>CREATE USER</div>
-        <div style={{marginBottom:10}}><label style={lbl}>Username</label><input style={inp} value={uf.username} onChange={e=>setUF({...uf,username:e.target.value})}/></div>
-        <div style={{marginBottom:10}}><label style={lbl}>Password</label><input style={inp} type="password" value={uf.password} onChange={e=>setUF({...uf,password:e.target.value})}/></div>
-        <div style={{marginBottom:10}}><label style={lbl}>Full Name</label><input style={inp} value={uf.full_name} onChange={e=>setUF({...uf,full_name:e.target.value})}/></div>
-        <div style={{marginBottom:10}}><label style={lbl}>Role</label><select style={inp} value={uf.role} onChange={e=>setUF({...uf,role:e.target.value})}><option value="user">User</option><option value="admin">Admin</option><option value="superadmin">Super Admin</option></select></div>
-        <div style={{marginBottom:10}}><label style={lbl}>Scope Level</label><select style={inp} value={uf.scope_level} onChange={e=>setUF({...uf,scope_level:e.target.value,scope_branch:e.target.value==="branch"?uf.scope_branch:""})}><option value="org">Org (full company)</option><option value="branch">Branch (one branch only)</option><option value="site">Site (assigned accounts only)</option></select></div>
-        {uf.scope_level==="branch"&&<div style={{marginBottom:10}}><label style={lbl}>Branch</label><select style={inp} value={uf.scope_branch} onChange={e=>setUF({...uf,scope_branch:e.target.value})}><option value="">Select...</option>{(stg.branches||[]).map(b=><option key={b} value={b}>{b}</option>)}</select></div>}
-        {uf.role==="user"&&<div style={{marginBottom:14}}><label style={lbl}>View Access</label><div style={{display:"flex",gap:10,flexWrap:"wrap",padding:"6px 0"}}>{[["dashboard","Dashboard"],["command","Command"],["analytics","Analytics"],["notifications","Notifications"]].map(([k,l])=><label key={k} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:uf.view_permissions[k]?C.t:C.m,cursor:"pointer"}}><input type="checkbox" checked={uf.view_permissions[k]} onChange={e=>setUF({...uf,view_permissions:{...uf.view_permissions,[k]:e.target.checked}})}/>{l}</label>)}</div></div>}
-        <div style={{display:"flex",gap:8}}><button style={bt("p")} onClick={createUser}>CREATE</button><button style={bt("g")} onClick={()=>setSUF(false)}>CANCEL</button></div>
-        <div style={{textAlign:"center",marginTop:14,fontSize:9,color:C.d,letterSpacing:2}}>BUILT FOR THE J3S OFFICE</div>
-      </div>
-    </div>}
     <J3S/>
   </div>;
 
-  // ═══ NOTIFICATIONS VIEW ═══
+  // ═══ NOTIFICATIONS ═══
   const Notif=()=>{
     const fDateFull=d=>d?new Date(d).toLocaleString("en-IN",{day:"2-digit",month:"short",year:"2-digit",hour:"2-digit",minute:"2-digit"}):"—";
     const evIcon={assigned:"📬",reassigned:"🔄",status_changed:"🔃",completed:"✅",deleted:"🗑️",remark_added:"💬"};
     const evColor={assigned:C.bl,reassigned:C.yl,status_changed:C.bl,completed:C.gn,deleted:C.rd,remark_added:C.g};
     return<div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
-        <div>
-          <div style={{fontSize:14,color:C.g,letterSpacing:2,fontWeight:700}}>🔔 NOTIFICATIONS</div>
-          <div style={{fontSize:10,color:C.m,marginTop:2}}>{unreadNotifCount} unread · {notifs.length} total · Auto-expires after 30/60 days</div>
-        </div>
-        <div style={{display:"flex",gap:6}}>
-          <button style={sb("s")} onClick={loadNotifs}>🔄 REFRESH</button>
-          {unreadNotifCount>0&&<button style={bt("p")} onClick={markAllNotifsRead}>MARK ALL READ</button>}
-        </div>
+        <div><div style={{fontSize:14,color:C.g,letterSpacing:2,fontWeight:700}}>🔔 NOTIFICATIONS</div><div style={{fontSize:10,color:C.m,marginTop:2}}>{unreadNotifCount} unread · {notifs.length} total</div></div>
+        <div style={{display:"flex",gap:6}}><button style={sb("s")} onClick={loadNotifs}>🔄 REFRESH</button>{unreadNotifCount>0&&<button style={bt("p")} onClick={markAllNotifsRead}>MARK ALL READ</button>}</div>
       </div>
-      {notifs.length===0?<div style={{...sec,textAlign:"center",padding:40,color:C.d,fontSize:12}}>No notifications yet. You'll be notified here when tasks are assigned to you, status changes, or remarks are added.</div>:
+      {notifs.length===0?<div style={{...sec,textAlign:"center",padding:40,color:C.d,fontSize:12}}>No notifications yet.</div>:
       <div style={{background:C.p,border:`1px solid ${C.bd}`}}>
         {notifs.map(n=><div key={n.id} style={{padding:"12px 16px",borderBottom:`1px solid #1a2418`,background:n.is_read?"transparent":`${C.g}08`,display:"flex",gap:12,alignItems:"flex-start",cursor:"pointer"}} onClick={()=>!n.is_read&&markNotifRead(n.id)}>
           <div style={{fontSize:20,minWidth:24}}>{evIcon[n.event_type]||"🔔"}</div>
@@ -598,38 +717,126 @@ const createUser = async () => {
     <J3S/>
   </div>;
 
-  // ═══ FORM ═══
-  const Frm=()=>{if(!fd)return null;return<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:200,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:20,overflowY:"auto"}} onClick={()=>setSF(false)}>
-    <div key={fd?.id||"new-account"} style={{background:C.dk,border:`2px solid ${C.g}`,width:"94%",maxWidth:720,padding:22,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-      <div style={{fontSize:14,fontWeight:700,color:C.g,letterSpacing:2,marginBottom:14}}>{eMode?"EDIT":"NEW"} ACCOUNT</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-        <div><label style={lbl}>Client</label><input style={inp} value={fd.client} onChange={e=>setFD({...fd,client:e.target.value})}/></div>
-        <div><label style={lbl}>Account Code</label><input style={inp} placeholder="e.g. KATH-JH-001" value={fd.account_code||""} onChange={e=>setFD({...fd,account_code:e.target.value})}/></div>
-        <div><label style={lbl}>Location</label><input style={inp} value={fd.location||""} onChange={e=>setFD({...fd,location:e.target.value})}/></div>
-        <div><label style={lbl}>Service Type</label><select style={inp} value={fd.service_type} onChange={e=>setFD({...fd,service_type:e.target.value})}>{stg.serviceTypes.map(t=><option key={t}>{t}</option>)}</select></div>
-        <div><label style={lbl}>Contract Value ({stg.currency.symbol}/yr)</label><input style={inp} type="number" value={fd.contract_value} onChange={e=>setFD({...fd,contract_value:Number(e.target.value)})}/></div>
-        <div><label style={lbl}>Start</label><input style={inp} type="date" value={fd.contract_start||""} onChange={e=>setFD({...fd,contract_start:e.target.value})}/></div>
-        <div><label style={lbl}>End</label><input style={inp} type="date" value={fd.contract_end||""} onChange={e=>setFD({...fd,contract_end:e.target.value})}/></div>
-        <div><label style={lbl}>Billing</label><select style={inp} value={fd.billing_cycle} onChange={e=>setFD({...fd,billing_cycle:e.target.value})}>{stg.billingCycles.map(b=><option key={b}>{b}</option>)}</select></div>
-        <div><label style={lbl}>Terms</label><select style={inp} value={fd.payment_terms} onChange={e=>setFD({...fd,payment_terms:Number(e.target.value)})}>{stg.paymentTermsPresets.map(d=><option key={d} value={d}>{d}d</option>)}</select></div>
-        <div><label style={lbl}>Status</label><select style={inp} value={fd.status} onChange={e=>setFD({...fd,status:e.target.value})}>{stg.accountStatuses.map(s=><option key={s}>{s}</option>)}</select></div>
-        <div><label style={lbl}>Health</label><select style={inp} value={fd.health} onChange={e=>setFD({...fd,health:e.target.value})}>{stg.healthStatuses.map(h=><option key={h.key} value={h.key}>{h.key}</option>)}</select></div>
-        <div><label style={lbl}>Pending ({stg.currency.symbol})</label><input style={inp} type="number" value={fd.pending_amount} onChange={e=>setFD({...fd,pending_amount:Number(e.target.value)})}/></div>
-        <div><label style={lbl}>Branch</label><select style={inp} value={fd.branch||""} onChange={e=>setFD({...fd,branch:e.target.value})}>{(stg.branches||[]).map(b=><option key={b}>{b}</option>)}</select></div>
-        <div><label style={lbl}>Field Officer Responsible</label><select style={inp} value={fd.field_officer_id||""} onChange={e=>setFD({...fd,field_officer_id:e.target.value||null})}><option value="">— None —</option>{users.filter(u=>u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name||u.username} {u.scope_level==="site"?"(site)":u.scope_level==="branch"?`(${u.scope_branch||"branch"})`:""}</option>)}</select></div>
-      </div>
-      <div style={{marginTop:14}}><label style={{...lbl,marginBottom:8}}>👥 STAFF BREAKDOWN</label>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:8}}>
-          {stg.staffRoles.map(r=>{const v=fd.staff_breakdown?.[r.key]||{required:0,deployed:0};return<div key={r.key} style={{background:C.bg,padding:10,border:`1px solid ${C.bd}`}}><div style={{fontSize:10,color:C.g,letterSpacing:1,marginBottom:6}}>{r.label.toUpperCase()}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}><div><label style={{fontSize:9,color:C.d}}>Req</label><input style={inp} type="number" min={0} value={v.required} onChange={e=>setFD({...fd,staff_breakdown:{...fd.staff_breakdown,[r.key]:{...v,required:Number(e.target.value)}}})}/></div><div><label style={{fontSize:9,color:C.d}}>Dep</label><input style={inp} type="number" min={0} value={v.deployed} onChange={e=>setFD({...fd,staff_breakdown:{...fd.staff_breakdown,[r.key]:{...v,deployed:Number(e.target.value)}}})}/></div></div></div>})}
-        </div></div>
-      <div style={{marginTop:12}}><label style={lbl}>Compliance</label><div style={{display:"flex",gap:14,flexWrap:"wrap",marginTop:4}}>{stg.complianceItems.map(ci=><label key={ci.key} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:C.s,cursor:"pointer"}}><input type="checkbox" checked={fd.compliance_status?.[ci.key]||false} onChange={e=>setFD({...fd,compliance_status:{...fd.compliance_status,[ci.key]:e.target.checked}})}/>{ci.label}</label>)}</div></div>
-      <div style={{marginTop:12}}><label style={lbl}>Notes</label><textarea style={{...inp,height:50,resize:"vertical"}} value={fd.notes||""} onChange={e=>setFD({...fd,notes:e.target.value})}/></div>
-      <div style={{marginTop:12}}><label style={lbl}>Contact</label><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}><input style={inp} placeholder="Name" value={fd.contacts?.[0]?.name||""} onChange={e=>setFD({...fd,contacts:[{...(fd.contacts?.[0]||{}),name:e.target.value}]})}/><input style={inp} placeholder="Phone" value={fd.contacts?.[0]?.phone||""} onChange={e=>setFD({...fd,contacts:[{...(fd.contacts?.[0]||{}),phone:e.target.value}]})}/><input style={inp} placeholder="Role" value={fd.contacts?.[0]?.role||""} onChange={e=>setFD({...fd,contacts:[{...(fd.contacts?.[0]||{}),role:e.target.value}]})}/></div></div>
-      <div style={{display:"flex",gap:8,marginTop:18}}><button style={bt("p")} onClick={saveAcc} disabled={syncing}>{syncing?"SAVING...":eMode?"UPDATE":"CREATE"}</button><button style={bt("g")} onClick={()=>setSF(false)}>CANCEL</button></div>
-      <div style={{textAlign:"center",marginTop:14,fontSize:9,color:C.d,letterSpacing:2}}>BUILT FOR THE J3S OFFICE</div>
-    </div></div>};
+  // ═══ TASKS VIEW ═══
+  const Tasks=()=>{
+    const visibleTasks=allTodos.filter(t=>{if(isA)return true;if(t.assigned_to===user.id||t.assigned_to===null)return true;return false});
+    const statusFiltered=taskFilter==="all"?visibleTasks:taskFilter==="active"?visibleTasks.filter(t=>["pending","in_progress","overdue"].includes(t.status)):taskFilter==="overdue"?visibleTasks.filter(t=>t.status==="overdue"):taskFilter==="completed"?visibleTasks.filter(t=>t.status==="completed"):visibleTasks.filter(t=>t.status===taskFilter);
+    const assigneeFiltered=taskAssigneeFlt==="all"?statusFiltered:taskAssigneeFlt==="me"?statusFiltered.filter(t=>t.assigned_to===user.id):taskAssigneeFlt==="unassigned"?statusFiltered.filter(t=>!t.assigned_to):statusFiltered.filter(t=>t.assigned_to===taskAssigneeFlt);
+    const filtered=!taskSearch?assigneeFiltered:assigneeFiltered.filter(t=>t.title.toLowerCase().includes(taskSearch.toLowerCase())||(t.description||"").toLowerCase().includes(taskSearch.toLowerCase())||(t.account_name||"").toLowerCase().includes(taskSearch.toLowerCase())||(t.assigned_to_name||"").toLowerCase().includes(taskSearch.toLowerCase()));
+    const st={all:visibleTasks.length,active:visibleTasks.filter(t=>["pending","in_progress","overdue"].includes(t.status)).length,pending:visibleTasks.filter(t=>t.status==="pending").length,in_progress:visibleTasks.filter(t=>t.status==="in_progress").length,overdue:visibleTasks.filter(t=>t.status==="overdue").length,completed:visibleTasks.filter(t=>t.status==="completed").length};
+    const prC=p=>({critical:C.rd,high:"#e85a3a",normal:C.g,low:C.m}[p]||C.g);
+    const stC=s=>({pending:C.yl,in_progress:C.bl,completed:C.gn,overdue:C.rd,cancelled:C.m}[s]||C.g);
+    const fmtTs=ts=>{if(!ts)return"—";const d=new Date(ts);return d.toLocaleString("en-IN",{day:"2-digit",month:"short",year:"2-digit",hour:"2-digit",minute:"2-digit"})};
+    const fmtDate=d=>{if(!d)return"—";return new Date(d).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"2-digit"})};
+    const daysSince=d=>{if(!d)return 0;return Math.floor((new Date()-new Date(d))/864e5)};
+    const selTask=selTaskId?allTodos.find(t=>t.id===selTaskId):null;
+    const selUpdates=selTask?allTaskUpdates.filter(u=>u.todo_id===selTask.id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)):[];
+    const canPostUpdate=selTask&&(isA||selTask.assigned_to===user.id||selTask.assigned_by===user.id);
 
-  // ═══ COMMAND PANELS (4-Panel Dashboard) ═══
+    return<div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
+        <div><div style={{fontSize:14,color:C.g,letterSpacing:2,fontWeight:700}}>📋 TASK TRACKER</div><div style={{fontSize:10,color:C.m,marginTop:2}}>{st.active} active · {st.overdue} overdue · {st.completed} completed · {st.all} total</div></div>
+        <div style={{display:"flex",gap:6}}><button style={sb("s")} onClick={loadTasks}>🔄 REFRESH</button><button style={bt("p")} onClick={()=>{setEditTask(null);setTaskForm(defTaskForm);setShowTaskForm(true)}}>+ NEW TASK</button></div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginBottom:14}}>
+        {[["ALL",st.all,C.t,"all"],["ACTIVE",st.active,C.yl,"active"],["PENDING",st.pending,C.yl,"pending"],["IN PROGRESS",st.in_progress,C.bl,"in_progress"],["OVERDUE",st.overdue,C.rd,"overdue"],["COMPLETED",st.completed,C.gn,"completed"]].map(([l,v,c,f])=>
+          <button key={f} onClick={()=>setTaskFilter(f)} style={{background:taskFilter===f?`${c}15`:C.p,border:`1px solid ${taskFilter===f?c:C.bd}`,padding:"10px 8px",cursor:"pointer",fontFamily:F,textAlign:"center"}}>
+            <div style={{fontSize:22,fontWeight:700,color:c}}>{v}</div><div style={{fontSize:9,color:C.m,letterSpacing:1.5,marginTop:2}}>{l}</div>
+          </button>)}
+      </div>
+      <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+        <input style={{...inp,width:260,flexShrink:0}} placeholder="Search title / description / account..." value={taskSearch} onChange={e=>setTaskSearch(e.target.value)}/>
+        <select style={{...inp,width:180}} value={taskAssigneeFlt} onChange={e=>setTaskAssigneeFlt(e.target.value)}><option value="all">All assignees</option><option value="me">🎯 Assigned to me</option><option value="unassigned">Unassigned</option>{users.filter(u=>u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name||u.username}</option>)}</select>
+        <div style={{fontSize:10,color:C.m,marginLeft:6}}>{filtered.length} task(s)</div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:selTask?"minmax(320px,1fr) 2fr":"1fr",gap:14,alignItems:"flex-start"}}>
+        <div style={{background:C.p,border:`1px solid ${C.bd}`,maxHeight:"calc(100vh - 320px)",overflowY:"auto"}}>
+          {filtered.length===0?<div style={{padding:40,textAlign:"center",color:C.d,fontSize:11}}>No tasks match the current filter</div>:
+          filtered.map(t=>{const isSel=selTaskId===t.id;const updCount=allTaskUpdates.filter(u=>u.todo_id===t.id).length;const isOd=t.status==="overdue";
+            return<div key={t.id} onClick={()=>setSelTaskId(t.id===selTaskId?null:t.id)} style={{padding:"12px 14px",borderBottom:`1px solid #1a2418`,background:isSel?`${C.g}15`:isOd?`${C.rd}08`:"transparent",cursor:"pointer",borderLeft:isSel?`3px solid ${C.g}`:"3px solid transparent"}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,color:t.status==="completed"?C.m:C.t,fontWeight:700,textDecoration:t.status==="completed"?"line-through":"none",marginBottom:3}}>{t.title}</div>
+                <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:4}}>
+                  <span style={pill(prC(t.priority))}>{t.priority}</span>
+                  <span style={pill(stC(t.status))}>{t.status.replace("_"," ")}</span>
+                  {updCount>0&&<span style={pill(C.bl)}>💬 {updCount}</span>}
+                </div>
+              </div>
+              <div style={{fontSize:10,color:C.m,display:"flex",gap:6,flexWrap:"wrap"}}>
+                {t.assigned_to_name&&<span>→ {t.assigned_to_name}</span>}
+                {t.account_name&&<span>· 📁 {t.account_name}</span>}
+              </div>
+              {t.due_date&&<div style={{fontSize:10,color:isOd?C.rd:C.m,marginTop:3}}>Due: {fmtDate(t.due_date)}</div>}
+            </div>})}
+        </div>
+        {selTask&&<div style={{background:C.p,border:`1px solid ${C.bd}`,maxHeight:"calc(100vh - 320px)",overflowY:"auto"}}>
+          <div style={{padding:"16px 18px",borderBottom:`1px solid ${C.bd}`,background:"linear-gradient(135deg,#111a0f 0%,#141e14 100%)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:8}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:16,fontWeight:700,color:C.t,marginBottom:4}}>{selTask.title}</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <span style={pill(prC(selTask.priority))}>{selTask.priority}</span>
+                  <span style={pill(stC(selTask.status))}>{selTask.status.replace("_"," ")}</span>
+                  {selTask.account_name&&<span style={pill(C.bl)}>📁 {selTask.account_name}</span>}
+                </div>
+              </div>
+              <div style={{display:"flex",gap:4}}>
+                {(isA||selTask.assigned_by===user.id)&&<button style={sb("s")} onClick={()=>{setEditTask(selTask);setTaskForm({title:selTask.title,description:selTask.description||"",priority:selTask.priority,assigned_to:selTask.assigned_to||"",assigned_to_name:selTask.assigned_to_name||"",account_id:selTask.account_id||"",due_date:selTask.due_date||"",tags:(selTask.tags||[]).join(", ")});setShowTaskForm(true)}}>✎ EDIT</button>}
+                {isA&&<button style={sb("d")} onClick={()=>delTask(selTask.id)}>✕ DELETE</button>}
+                <button style={sb("s")} onClick={()=>setSelTaskId(null)}>✕</button>
+              </div>
+            </div>
+            {selTask.description&&<div style={{fontSize:11,color:C.s,marginTop:8,lineHeight:1.5,whiteSpace:"pre-wrap"}}>{selTask.description}</div>}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginTop:12,fontSize:10}}>
+              <div><div style={{color:C.m,letterSpacing:1}}>ASSIGNED TO</div><div style={{color:C.t,fontWeight:700,marginTop:2}}>{selTask.assigned_to_name||"All"}</div></div>
+              <div><div style={{color:C.m,letterSpacing:1}}>ASSIGNED BY</div><div style={{color:C.t,fontWeight:700,marginTop:2}}>{selTask.assigned_by_name||"—"}</div></div>
+              <div><div style={{color:C.m,letterSpacing:1}}>DUE DATE</div><div style={{color:selTask.status==="overdue"?C.rd:C.t,fontWeight:700,marginTop:2}}>{fmtDate(selTask.due_date)}</div></div>
+              <div><div style={{color:C.m,letterSpacing:1}}>CREATED</div><div style={{color:C.t,fontWeight:700,marginTop:2}}>{daysSince(selTask.created_at)}d ago</div></div>
+            </div>
+            {selTask.tags&&selTask.tags.length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:10}}>{selTask.tags.map((tg,i)=><span key={i} style={{...pill(C.m),background:"#1a2418"}}>#{tg}</span>)}</div>}
+          </div>
+          <div style={{padding:"16px 18px"}}>
+            <div style={{fontSize:11,color:C.g,letterSpacing:2,marginBottom:12,textTransform:"uppercase"}}>📜 Activity Log ({selUpdates.length})</div>
+            {selUpdates.length===0?<div style={{fontSize:11,color:C.d,fontStyle:"italic",marginBottom:14}}>No updates yet.</div>:
+            <div style={{marginBottom:14,position:"relative",paddingLeft:22}}>
+              <div style={{position:"absolute",left:7,top:6,bottom:6,width:2,background:C.bd}}/>
+              {selUpdates.map((u,i)=>{const isStatusChange=!!u.status_change;const stC2=s=>({pending:C.yl,in_progress:C.bl,completed:C.gn,overdue:C.rd,cancelled:C.m}[s]||C.g);
+                return<div key={u.id} style={{position:"relative",marginBottom:14,paddingBottom:8}}>
+                  <div style={{position:"absolute",left:-20,top:4,width:12,height:12,borderRadius:"50%",background:isStatusChange?stC2(u.status_change):C.g,border:`2px solid ${C.bg}`}}/>
+                  <div style={{background:C.bg,padding:"10px 12px",border:`1px solid ${C.bd}`,borderLeft:`3px solid ${isStatusChange?stC2(u.status_change):C.g}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:6}}>
+                      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                        <span style={{fontSize:11,color:C.g,fontWeight:700}}>👤 {u.author_name||"Unknown"}</span>
+                        {isStatusChange&&<span style={pill(stC2(u.status_change))}>→ {u.status_change.replace("_"," ")}</span>}
+                      </div>
+                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                        <span style={{fontSize:9,color:C.d,fontFamily:F}}>{fmtTs(u.created_at)}</span>
+                        {(isA||u.author_id===user.id)&&<span style={{color:C.rd,cursor:"pointer",fontSize:11}} onClick={()=>delTaskUpdate(u.id)}>✕</span>}
+                      </div>
+                    </div>
+                    <div style={{fontSize:12,color:C.t,lineHeight:1.5,whiteSpace:"pre-wrap"}}>{u.update_text}</div>
+                  </div>
+                </div>})}
+            </div>}
+            {canPostUpdate?<div style={{background:C.bg,border:`1px solid ${C.bd}`,padding:12}}>
+              <div style={{fontSize:10,color:C.g,letterSpacing:1.5,marginBottom:8}}>✍ ADD UPDATE</div>
+              <textarea style={{...inp,height:70,resize:"vertical",marginBottom:8}} placeholder="What progress have you made? What blockers? What's next?" value={updateText} onChange={e=>setUpdateText(e.target.value)}/>
+              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                <div style={{flex:1,minWidth:160}}>
+                  <label style={{...lbl,marginBottom:2}}>Change status? (optional)</label>
+                  <select style={inp} value={updateStatus} onChange={e=>setUpdateStatus(e.target.value)}><option value="">— No change —</option><option value="pending">Pending</option><option value="in_progress">In Progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select>
+                </div>
+                <button style={{...bt("p"),marginTop:14}} onClick={()=>postTaskUpdate(selTask.id)} disabled={syncing||!updateText.trim()}>{syncing?"POSTING...":"POST UPDATE"}</button>
+              </div>
+            </div>:<div style={{fontSize:10,color:C.d,textAlign:"center",padding:10,fontStyle:"italic"}}>You can view this task but cannot post updates.</div>}
+          </div>
+        </div>}
+      </div>
+      <J3S/>
+    </div>;
+  };
+
+  // ═══ COMMAND PANELS ═══
   const CommandPanels=({accs,users,currentUser,isAdmin,stg,loadAll,onNotifChange})=>{
     const cGet=async(t,p="")=>get(t,p);
     const cPost=async(t,d)=>post(t,d);
@@ -653,7 +860,6 @@ const createUser = async () => {
     const mBx={background:C.dk,border:`1px solid ${C.g}33`,padding:20,width:"100%",maxWidth:520,maxHeight:"85vh",overflowY:"auto",fontFamily:F};
     const cLbl={fontSize:9,color:C.m,letterSpacing:1.5,marginBottom:3,textTransform:"uppercase",fontFamily:F};
 
-    // ═══ PANEL 1: ACCOUNT UPDATES ═══
     function UpdPanel(){
       const[items,setItems]=useState([]);const[showA,setShowA]=useState(false);const[ld,setLd]=useState(true);const[flt,setFlt]=useState("all");
       const[fm,setFm]=useState({title:"",description:"",category:"general",priority:"normal",account_id:""});
@@ -711,90 +917,37 @@ const createUser = async () => {
       </div>;
     }
 
-    // ═══ PANEL 2: TO-DO TRACKER ═══
     function TodoPanel(){
-      const[todos,setTodos]=useState([]);
-      const[showA,setShowA]=useState(false);
-      const[editI,setEditI]=useState(null);
-      const[ld,setLd]=useState(true);
-      const[sf,setSf]=useState("active");
-      const[remarkModal,setRemarkModal]=useState(null);
-      const[remarkText,setRemarkText]=useState("");
+      const[todos,setTodos]=useState([]);const[showA,setShowA]=useState(false);const[editI,setEditI]=useState(null);const[ld,setLd]=useState(true);const[sf,setSf]=useState("active");
+      const[remarkModal,setRemarkModal]=useState(null);const[remarkText,setRemarkText]=useState("");
       const defF={title:"",description:"",priority:"normal",assigned_to:"",assigned_to_name:"",account_id:"",due_date:"",tags:""};
       const[fm,setFm]=useState(defF);
-
       const load=useCallback(async()=>{try{const d=await cGet("todos","?order=created_at.desc&limit=100");const now=new Date();
         const visible=(d||[]).filter(t=>isAdmin||t.assigned_to===null||t.assigned_to===currentUser?.id);
         setTodos(visible.map(t=>(["pending","in_progress"].includes(t.status)&&t.due_date&&new Date(t.due_date)<now)?{...t,status:"overdue"}:t))}catch(e){}setLd(false)},[]);
       useEffect(()=>{load()},[load]);
-
       const notify=async(todo,eventType,message,remark)=>{
-        if(!todo)return;
-        const recipients=new Set();
-        if(todo.assigned_to)recipients.add(todo.assigned_to);
-        if(todo.assigned_by)recipients.add(todo.assigned_by);
-        (users||[]).filter(u=>u.role==="admin"&&u.is_active).forEach(u=>recipients.add(u.id));
-        if(currentUser?.id)recipients.delete(currentUser.id);
+        if(!todo)return;const recipients=new Set();if(todo.assigned_to)recipients.add(todo.assigned_to);if(todo.assigned_by)recipients.add(todo.assigned_by);
+        (users||[]).filter(u=>u.role==="admin"&&u.is_active).forEach(u=>recipients.add(u.id));if(currentUser?.id)recipients.delete(currentUser.id);
         const rows=[...recipients].map(rid=>({recipient_id:rid,todo_id:todo.id,todo_title:todo.title,event_type:eventType,message,remark:remark||null,actor_id:currentUser?.id||null,actor_name:currentUser?.full_name||currentUser?.username||"System"}));
         if(rows.length>0){await cPost("todo_notifications",rows);if(onNotifChange)onNotifChange();}
       };
-
       const save=async()=>{if(!fm.title.trim())return;const ac=accs.find(a=>a.id===fm.account_id);
         const bd={title:fm.title,description:fm.description,priority:fm.priority,assigned_to:fm.assigned_to||null,assigned_to_name:fm.assigned_to_name||"All",account_id:fm.account_id||null,account_name:ac?.client||"",due_date:fm.due_date||null,tags:fm.tags?fm.tags.split(",").map(t=>t.trim()).filter(Boolean):[],assigned_by:currentUser?.id||null,assigned_by_name:currentUser?.full_name||"Admin"};
-        if(editI){
-          bd.updated_at=new Date().toISOString();
-          const res=await cPatch("todos",`?id=eq.${editI.id}`,bd);
-          const updated=(res&&res[0])||{...editI,...bd};
-          if(editI.assigned_to!==bd.assigned_to){
-            await notify(updated,"reassigned",`Task reassigned to ${bd.assigned_to_name}`);
-          }
-        }else{
-          bd.notified_at=new Date().toISOString();bd.status="pending";
-          const res=await cPost("todos",bd);
-          const created=res&&res[0];
-          if(created)await notify(created,"assigned",`New task assigned: ${bd.title}`);
-        }
+        if(editI){bd.updated_at=new Date().toISOString();const res=await cPatch("todos",`?id=eq.${editI.id}`,bd);const updated=(res&&res[0])||{...editI,...bd};if(editI.assigned_to!==bd.assigned_to)await notify(updated,"reassigned",`Task reassigned to ${bd.assigned_to_name}`);}
+        else{bd.notified_at=new Date().toISOString();bd.status="pending";const res=await cPost("todos",bd);const created=res&&res[0];if(created)await notify(created,"assigned",`New task assigned: ${bd.title}`);}
         setShowA(false);setEditI(null);setFm(defF);load()};
-
-      const upSt=async(id,s)=>{
-        const todo=todos.find(t=>t.id===id);
-        if(s==="completed"){
-          setRemarkModal({type:"complete",todo});
-          setRemarkText("");
-          return;
-        }
-        const bd={status:s,updated_at:new Date().toISOString()};
-        await cPatch("todos",`?id=eq.${id}`,bd);
-        if(todo)await notify(todo,"status_changed",`Status changed to ${s.replace("_"," ")}`);
-        load();
-      };
-
-      const confirmComplete=async()=>{
-        if(!remarkText.trim()){alert("Completion remark is required");return;}
-        const todo=remarkModal.todo;
+      const upSt=async(id,s)=>{const todo=todos.find(t=>t.id===id);if(s==="completed"){setRemarkModal({type:"complete",todo});setRemarkText("");return;}
+        const bd={status:s,updated_at:new Date().toISOString()};await cPatch("todos",`?id=eq.${id}`,bd);if(todo)await notify(todo,"status_changed",`Status changed to ${s.replace("_"," ")}`);load()};
+      const confirmComplete=async()=>{if(!remarkText.trim()){alert("Completion remark is required");return;}const todo=remarkModal.todo;
         const bd={status:"completed",completed_at:new Date().toISOString(),completion_remark:remarkText.trim(),updated_at:new Date().toISOString()};
-        await cPatch("todos",`?id=eq.${todo.id}`,bd);
-        await notify(todo,"completed",`Task completed: ${todo.title}`,remarkText.trim());
-        setRemarkModal(null);setRemarkText("");load();
-      };
-
-      const del=async(id)=>{
-        const todo=todos.find(t=>t.id===id);
-        setRemarkModal({type:"delete",todo});
-        setRemarkText("");
-      };
-
-      const confirmDelete=async()=>{
-        if(!remarkText.trim()){alert("Reason for deletion is required");return;}
-        const todo=remarkModal.todo;
-        await notify(todo,"deleted",`Task deleted: ${todo.title}`,remarkText.trim());
-        await cRm("todos",`?id=eq.${todo.id}`);
-        setRemarkModal(null);setRemarkText("");load();
-      };
-
+        await cPatch("todos",`?id=eq.${todo.id}`,bd);await notify(todo,"completed",`Task completed: ${todo.title}`,remarkText.trim());
+        setRemarkModal(null);setRemarkText("");load()};
+      const del=async(id)=>{const todo=todos.find(t=>t.id===id);setRemarkModal({type:"delete",todo});setRemarkText("");};
+      const confirmDelete=async()=>{if(!remarkText.trim()){alert("Reason for deletion is required");return;}const todo=remarkModal.todo;
+        await notify(todo,"deleted",`Task deleted: ${todo.title}`,remarkText.trim());await cRm("todos",`?id=eq.${todo.id}`);setRemarkModal(null);setRemarkText("");load()};
       const fil=sf==="active"?todos.filter(t=>["pending","in_progress","overdue"].includes(t.status)):sf==="completed"?todos.filter(t=>t.status==="completed"):sf==="overdue"?todos.filter(t=>t.status==="overdue"):todos;
       const st={t:todos.length,p:todos.filter(t=>t.status==="pending").length,o:todos.filter(t=>t.status==="overdue").length,c:todos.filter(t=>t.status==="completed").length};
-
       return<div style={pnl}>
         <div style={pnlH(C.bl)}><div style={pnlT(C.bl)}>📝 TO-DO TRACKER</div><div style={{display:"flex",gap:6,alignItems:"center"}}>
           {st.o>0&&<span style={{...cBdg(C.rd),animation:"pulse 2s infinite"}}>{st.o} OVERDUE</span>}
@@ -815,8 +968,7 @@ const createUser = async () => {
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:"flex",gap:4,alignItems:"center",marginBottom:2,flexWrap:"wrap"}}>
                   <span style={{fontSize:10,color:t.status==="completed"?C.m:C.t,fontWeight:700,textDecoration:t.status==="completed"?"line-through":"none"}}>{t.title}</span>
-                  <span style={cBdg(prC(t.priority))}>{t.priority}</span>
-                  <span style={cBdg(stC(t.status))}>{t.status.replace("_"," ")}</span>
+                  <span style={cBdg(prC(t.priority))}>{t.priority}</span><span style={cBdg(stC(t.status))}>{t.status.replace("_"," ")}</span>
                 </div>
                 <div style={{display:"flex",gap:4,fontSize:8,color:C.d,flexWrap:"wrap"}}>
                   {t.assigned_to_name&&<span style={cTag(C.bl)}>→ {t.assigned_to_name}</span>}
@@ -843,7 +995,7 @@ const createUser = async () => {
               <div><div style={cLbl}>DUE DATE</div><input type="date" style={cInp} value={fm.due_date} onChange={e=>setFm({...fm,due_date:e.target.value})}/></div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              <div><div style={cLbl}>ASSIGN TO</div><select style={cSel} value={fm.assigned_to} onChange={e=>{const uid=e.target.value;const u=users.find(x=>x.id===uid);setFm({...fm,assigned_to:uid,assigned_to_name:u?(u.full_name||u.username):"All"})}}><option value="">— All (Everyone) —</option>{users.filter(u=>u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name||u.username}</option>)}</select></div>
+              <div><div style={cLbl}>ASSIGN TO</div><select style={cSel} value={fm.assigned_to} onChange={e=>{const uid=e.target.value;const u=users.find(x=>x.id===uid);setFm({...fm,assigned_to:uid,assigned_to_name:u?(u.full_name||u.username):"All"})}}><option value="">— All —</option>{users.filter(u=>u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name||u.username}</option>)}</select></div>
               <div><div style={cLbl}>ACCOUNT</div><select style={cSel} value={fm.account_id} onChange={e=>setFm({...fm,account_id:e.target.value})}><option value="">— None —</option>{accs.map(a=><option key={a.id} value={a.id}>{a.client}</option>)}</select></div>
             </div>
             <div><div style={cLbl}>TAGS</div><input style={cInp} value={fm.tags} onChange={e=>setFm({...fm,tags:e.target.value})} placeholder="urgent, followup..."/></div>
@@ -851,26 +1003,15 @@ const createUser = async () => {
           </div>
         </div></div>}
         {remarkModal&&<div style={mOv} onClick={()=>{setRemarkModal(null);setRemarkText("")}}><div style={mBx} onClick={e=>e.stopPropagation()}>
-          <div style={{...pnlT(remarkModal.type==="delete"?C.rd:C.gn),marginBottom:14}}>
-            {remarkModal.type==="delete"?"🗑 REASON FOR DELETION":"✅ COMPLETION REMARK"}
-          </div>
+          <div style={{...pnlT(remarkModal.type==="delete"?C.rd:C.gn),marginBottom:14}}>{remarkModal.type==="delete"?"🗑 REASON FOR DELETION":"✅ COMPLETION REMARK"}</div>
           <div style={{fontSize:11,color:C.m,marginBottom:10}}>Task: <span style={{color:C.t,fontWeight:700}}>{remarkModal.todo?.title}</span></div>
-          <div style={{marginBottom:12}}>
-            <div style={cLbl}>{remarkModal.type==="delete"?"REASON *":"REMARK *"}</div>
-            <textarea style={{...cInp,height:80,resize:"vertical"}} value={remarkText} onChange={e=>setRemarkText(e.target.value)} placeholder={remarkModal.type==="delete"?"Why is this task being deleted?":"Describe the outcome or notes about this task..."} autoFocus/>
-          </div>
+          <div style={{marginBottom:12}}><div style={cLbl}>{remarkModal.type==="delete"?"REASON *":"REMARK *"}</div><textarea style={{...cInp,height:80,resize:"vertical"}} value={remarkText} onChange={e=>setRemarkText(e.target.value)} placeholder={remarkModal.type==="delete"?"Why is this task being deleted?":"Describe the outcome..."} autoFocus/></div>
           <div style={{fontSize:9,color:C.d,marginBottom:12}}>This action will notify the assignee, creator, and all admins.</div>
-          <div style={{display:"flex",gap:8}}>
-            <button style={remarkModal.type==="delete"?bt("d"):bt("p")} onClick={remarkModal.type==="delete"?confirmDelete:confirmComplete}>
-              {remarkModal.type==="delete"?"CONFIRM DELETE":"MARK COMPLETE"}
-            </button>
-            <button style={bt("g")} onClick={()=>{setRemarkModal(null);setRemarkText("")}}>CANCEL</button>
-          </div>
+          <div style={{display:"flex",gap:8}}><button style={remarkModal.type==="delete"?bt("d"):bt("p")} onClick={remarkModal.type==="delete"?confirmDelete:confirmComplete}>{remarkModal.type==="delete"?"CONFIRM DELETE":"MARK COMPLETE"}</button><button style={bt("g")} onClick={()=>{setRemarkModal(null);setRemarkText("")}}>CANCEL</button></div>
         </div></div>}
       </div>;
     }
 
-    // ═══ PANEL 3: COLLECTIONS TRACKER ═══
     function CollPanel(){
       const[items,setItems]=useState([]);const[showA,setShowA]=useState(false);const[ld,setLd]=useState(true);const[mFlt,setMFlt]=useState("");
       const defF={account_id:"",invoice_number:"",invoice_month:"",invoice_date:"",due_date:"",amount:"",gst_amount:"",notes:""};
@@ -939,7 +1080,6 @@ const createUser = async () => {
       </div>;
     }
 
-    // ═══ PANEL 4: SALES PIPELINE ═══
     function PipePanel(){
       const[leads,setLeads]=useState([]);const[stages,setStages]=useState([]);const[tasks,setTasks]=useState([]);
       const[showA,setShowA]=useState(false);const[showT,setShowT]=useState(null);const[editL,setEditL]=useState(null);
@@ -1103,220 +1243,6 @@ const createUser = async () => {
     </>;
   };
 
-  // ═══ TASKS VIEW (Full Tab) ═══
-  const Tasks=()=>{
-    // Filter visible tasks based on scope & role
-    const visibleTasks=allTodos.filter(t=>{
-      if(isA)return true;
-      // Non-admins see tasks assigned to them or unassigned
-      if(t.assigned_to===user.id||t.assigned_to===null)return true;
-      return false;
-    });
-
-    // Apply status filter
-    const statusFiltered=taskFilter==="all"?visibleTasks:
-      taskFilter==="active"?visibleTasks.filter(t=>["pending","in_progress","overdue"].includes(t.status)):
-      taskFilter==="overdue"?visibleTasks.filter(t=>t.status==="overdue"):
-      taskFilter==="completed"?visibleTasks.filter(t=>t.status==="completed"):
-      visibleTasks.filter(t=>t.status===taskFilter);
-
-    // Assignee filter
-    const assigneeFiltered=taskAssigneeFlt==="all"?statusFiltered:
-      taskAssigneeFlt==="me"?statusFiltered.filter(t=>t.assigned_to===user.id):
-      taskAssigneeFlt==="unassigned"?statusFiltered.filter(t=>!t.assigned_to):
-      statusFiltered.filter(t=>t.assigned_to===taskAssigneeFlt);
-
-    // Search filter
-    const filtered=!taskSearch?assigneeFiltered:assigneeFiltered.filter(t=>
-      t.title.toLowerCase().includes(taskSearch.toLowerCase())||
-      (t.description||"").toLowerCase().includes(taskSearch.toLowerCase())||
-      (t.account_name||"").toLowerCase().includes(taskSearch.toLowerCase())||
-      (t.assigned_to_name||"").toLowerCase().includes(taskSearch.toLowerCase())
-    );
-
-    // Stats
-    const st={
-      all:visibleTasks.length,
-      active:visibleTasks.filter(t=>["pending","in_progress","overdue"].includes(t.status)).length,
-      pending:visibleTasks.filter(t=>t.status==="pending").length,
-      in_progress:visibleTasks.filter(t=>t.status==="in_progress").length,
-      overdue:visibleTasks.filter(t=>t.status==="overdue").length,
-      completed:visibleTasks.filter(t=>t.status==="completed").length,
-    };
-
-    const prC=p=>({critical:C.rd,high:"#e85a3a",normal:C.g,low:C.m}[p]||C.g);
-    const stC=s=>({pending:C.yl,in_progress:C.bl,completed:C.gn,overdue:C.rd,cancelled:C.m}[s]||C.g);
-    const fmtTs=ts=>{if(!ts)return"—";const d=new Date(ts);return d.toLocaleString("en-IN",{day:"2-digit",month:"short",year:"2-digit",hour:"2-digit",minute:"2-digit"})};
-    const fmtDate=d=>{if(!d)return"—";return new Date(d).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"2-digit"})};
-    const daysSince=d=>{if(!d)return 0;return Math.floor((new Date()-new Date(d))/864e5)};
-
-    const selTask=selTaskId?allTodos.find(t=>t.id===selTaskId):null;
-    const selUpdates=selTask?allTaskUpdates.filter(u=>u.todo_id===selTask.id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)):[];
-    const canPostUpdate=selTask&&(isA||selTask.assigned_to===user.id||selTask.assigned_by===user.id);
-
-    return<div>
-      {/* Header + Stats */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
-        <div>
-          <div style={{fontSize:14,color:C.g,letterSpacing:2,fontWeight:700}}>📋 TASK TRACKER</div>
-          <div style={{fontSize:10,color:C.m,marginTop:2}}>{st.active} active · {st.overdue} overdue · {st.completed} completed · {st.all} total</div>
-        </div>
-        <div style={{display:"flex",gap:6}}>
-          <button style={sb("s")} onClick={loadTasks}>🔄 REFRESH</button>
-          <button style={bt("p")} onClick={()=>{setEditTask(null);setTaskForm(defTaskForm);setShowTaskForm(true)}}>+ NEW TASK</button>
-        </div>
-      </div>
-
-      {/* Stat pills */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginBottom:14}}>
-        {[["ALL",st.all,C.t,"all"],["ACTIVE",st.active,C.yl,"active"],["PENDING",st.pending,C.yl,"pending"],["IN PROGRESS",st.in_progress,C.bl,"in_progress"],["OVERDUE",st.overdue,C.rd,"overdue"],["COMPLETED",st.completed,C.gn,"completed"]].map(([l,v,c,f])=>
-          <button key={f} onClick={()=>setTaskFilter(f)} style={{background:taskFilter===f?`${c}15`:C.p,border:`1px solid ${taskFilter===f?c:C.bd}`,padding:"10px 8px",cursor:"pointer",fontFamily:F,textAlign:"center"}}>
-            <div style={{fontSize:22,fontWeight:700,color:c}}>{v}</div>
-            <div style={{fontSize:9,color:C.m,letterSpacing:1.5,marginTop:2}}>{l}</div>
-          </button>)}
-      </div>
-
-      {/* Search + Assignee filter */}
-      <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
-        <input style={{...inp,width:260,flexShrink:0}} placeholder="Search title / description / account..." value={taskSearch} onChange={e=>setTaskSearch(e.target.value)}/>
-        <select style={{...inp,width:180}} value={taskAssigneeFlt} onChange={e=>setTaskAssigneeFlt(e.target.value)}>
-          <option value="all">All assignees</option>
-          <option value="me">🎯 Assigned to me</option>
-          <option value="unassigned">Unassigned</option>
-          {users.filter(u=>u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name||u.username}</option>)}
-        </select>
-        <div style={{fontSize:10,color:C.m,marginLeft:6}}>{filtered.length} task(s)</div>
-      </div>
-
-      {/* Main layout: list | detail */}
-      <div style={{display:"grid",gridTemplateColumns:selTask?"minmax(320px,1fr) 2fr":"1fr",gap:14,alignItems:"flex-start"}}>
-
-        {/* Task list */}
-        <div style={{background:C.p,border:`1px solid ${C.bd}`,maxHeight:"calc(100vh - 320px)",overflowY:"auto"}}>
-          {filtered.length===0?<div style={{padding:40,textAlign:"center",color:C.d,fontSize:11}}>No tasks match the current filter</div>:
-          filtered.map(t=>{
-            const isSel=selTaskId===t.id;
-            const updCount=allTaskUpdates.filter(u=>u.todo_id===t.id).length;
-            const isOd=t.status==="overdue";
-            return<div key={t.id} onClick={()=>setSelTaskId(t.id===selTaskId?null:t.id)} style={{padding:"12px 14px",borderBottom:`1px solid #1a2418`,background:isSel?`${C.g}15`:isOd?`${C.rd}08`:"transparent",cursor:"pointer",borderLeft:isSel?`3px solid ${C.g}`:"3px solid transparent"}}>
-              <div style={{display:"flex",gap:6,alignItems:"flex-start",marginBottom:4}}>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:12,color:t.status==="completed"?C.m:C.t,fontWeight:700,textDecoration:t.status==="completed"?"line-through":"none",marginBottom:3}}>{t.title}</div>
-                  <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:4}}>
-                    <span style={pill(prC(t.priority))}>{t.priority}</span>
-                    <span style={pill(stC(t.status))}>{t.status.replace("_"," ")}</span>
-                    {updCount>0&&<span style={pill(C.bl)}>💬 {updCount}</span>}
-                  </div>
-                </div>
-              </div>
-              <div style={{fontSize:10,color:C.m,display:"flex",gap:6,flexWrap:"wrap"}}>
-                {t.assigned_to_name&&<span>→ {t.assigned_to_name}</span>}
-                {t.account_name&&<span>· 📁 {t.account_name}</span>}
-              </div>
-              {t.due_date&&<div style={{fontSize:10,color:isOd?C.rd:C.m,marginTop:3}}>Due: {fmtDate(t.due_date)}</div>}
-            </div>})}
-        </div>
-
-        {/* Task detail + updates */}
-        {selTask&&<div style={{background:C.p,border:`1px solid ${C.bd}`,maxHeight:"calc(100vh - 320px)",overflowY:"auto"}}>
-          <div style={{padding:"16px 18px",borderBottom:`1px solid ${C.bd}`,background:"linear-gradient(135deg,#111a0f 0%,#141e14 100%)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:8}}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:16,fontWeight:700,color:C.t,marginBottom:4}}>{selTask.title}</div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  <span style={pill(prC(selTask.priority))}>{selTask.priority}</span>
-                  <span style={pill(stC(selTask.status))}>{selTask.status.replace("_"," ")}</span>
-                  {selTask.account_name&&<span style={pill(C.bl)}>📁 {selTask.account_name}</span>}
-                </div>
-              </div>
-              <div style={{display:"flex",gap:4}}>
-                {(isA||selTask.assigned_by===user.id)&&<button style={sb("s")} onClick={()=>{setEditTask(selTask);setTaskForm({title:selTask.title,description:selTask.description||"",priority:selTask.priority,assigned_to:selTask.assigned_to||"",assigned_to_name:selTask.assigned_to_name||"",account_id:selTask.account_id||"",due_date:selTask.due_date||"",tags:(selTask.tags||[]).join(", ")});setShowTaskForm(true)}}>✎ EDIT</button>}
-                {isA&&<button style={sb("d")} onClick={()=>delTask(selTask.id)}>✕ DELETE</button>}
-                <button style={sb("s")} onClick={()=>setSelTaskId(null)}>✕</button>
-              </div>
-            </div>
-            {selTask.description&&<div style={{fontSize:11,color:C.s,marginTop:8,lineHeight:1.5,whiteSpace:"pre-wrap"}}>{selTask.description}</div>}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginTop:12,fontSize:10}}>
-              <div><div style={{color:C.m,letterSpacing:1}}>ASSIGNED TO</div><div style={{color:C.t,fontWeight:700,marginTop:2}}>{selTask.assigned_to_name||"All"}</div></div>
-              <div><div style={{color:C.m,letterSpacing:1}}>ASSIGNED BY</div><div style={{color:C.t,fontWeight:700,marginTop:2}}>{selTask.assigned_by_name||"—"}</div></div>
-              <div><div style={{color:C.m,letterSpacing:1}}>DUE DATE</div><div style={{color:selTask.status==="overdue"?C.rd:C.t,fontWeight:700,marginTop:2}}>{fmtDate(selTask.due_date)}</div></div>
-              <div><div style={{color:C.m,letterSpacing:1}}>CREATED</div><div style={{color:C.t,fontWeight:700,marginTop:2}}>{daysSince(selTask.created_at)}d ago</div></div>
-            </div>
-            {selTask.tags&&selTask.tags.length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:10}}>{selTask.tags.map((tg,i)=><span key={i} style={{...pill(C.m),background:"#1a2418"}}>#{tg}</span>)}</div>}
-          </div>
-
-          {/* Activity Timeline */}
-          <div style={{padding:"16px 18px"}}>
-            <div style={{fontSize:11,color:C.g,letterSpacing:2,marginBottom:12,textTransform:"uppercase"}}>📜 Activity Log ({selUpdates.length})</div>
-
-            {selUpdates.length===0?<div style={{fontSize:11,color:C.d,fontStyle:"italic",marginBottom:14}}>No updates yet. {canPostUpdate?"Post the first update below.":""}</div>:
-            <div style={{marginBottom:14,position:"relative",paddingLeft:22}}>
-              <div style={{position:"absolute",left:7,top:6,bottom:6,width:2,background:C.bd}}/>
-              {selUpdates.map((u,i)=>{
-                const isStatusChange=!!u.status_change;
-                return<div key={u.id} style={{position:"relative",marginBottom:14,paddingBottom:8}}>
-                  <div style={{position:"absolute",left:-20,top:4,width:12,height:12,borderRadius:"50%",background:isStatusChange?stC(u.status_change):C.g,border:`2px solid ${C.bg}`}}/>
-                  <div style={{background:C.bg,padding:"10px 12px",border:`1px solid ${C.bd}`,borderLeft:`3px solid ${isStatusChange?stC(u.status_change):C.g}`}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:6}}>
-                      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-                        <span style={{fontSize:11,color:C.g,fontWeight:700}}>👤 {u.author_name||"Unknown"}</span>
-                        {isStatusChange&&<span style={pill(stC(u.status_change))}>→ {u.status_change.replace("_"," ")}</span>}
-                      </div>
-                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                        <span style={{fontSize:9,color:C.d,fontFamily:F}}>{fmtTs(u.created_at)}</span>
-                        {(isA||u.author_id===user.id)&&<span style={{color:C.rd,cursor:"pointer",fontSize:11}} onClick={()=>delTaskUpdate(u.id)}>✕</span>}
-                      </div>
-                    </div>
-                    <div style={{fontSize:12,color:C.t,lineHeight:1.5,whiteSpace:"pre-wrap"}}>{u.update_text}</div>
-                  </div>
-                </div>})}
-            </div>}
-
-            {/* Post Update Composer */}
-            {canPostUpdate?<div style={{background:C.bg,border:`1px solid ${C.bd}`,padding:12}}>
-              <div style={{fontSize:10,color:C.g,letterSpacing:1.5,marginBottom:8}}>✍ ADD UPDATE</div>
-              <textarea style={{...inp,height:70,resize:"vertical",marginBottom:8}} placeholder="What progress have you made? What blockers? What's next?" value={updateText} onChange={e=>setUpdateText(e.target.value)}/>
-              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                <div style={{flex:1,minWidth:160}}>
-                  <label style={{...lbl,marginBottom:2}}>Change status? (optional)</label>
-                  <select style={inp} value={updateStatus} onChange={e=>setUpdateStatus(e.target.value)}>
-                    <option value="">— No change —</option>
-                    <option value="pending">Pending</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
-                <button style={{...bt("p"),marginTop:14}} onClick={()=>postTaskUpdate(selTask.id)} disabled={syncing||!updateText.trim()}>{syncing?"POSTING...":"POST UPDATE"}</button>
-              </div>
-            </div>:<div style={{fontSize:10,color:C.d,textAlign:"center",padding:10,fontStyle:"italic"}}>You can view this task but cannot post updates. Only the assignee, creator, or admins can add updates.</div>}
-          </div>
-        </div>}
-      </div>
-
-      {/* Task Form Modal */}
-      {showTaskForm&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:200,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:40,overflowY:"auto"}} onClick={()=>{setShowTaskForm(false);setEditTask(null)}}>
-        <div style={{background:C.dk,border:`2px solid ${C.g}`,padding:22,width:"94%",maxWidth:560,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-          <div style={{fontSize:14,fontWeight:700,color:C.g,letterSpacing:2,marginBottom:14}}>{editTask?"EDIT":"NEW"} TASK</div>
-          <div style={{marginBottom:10}}><label style={lbl}>Title *</label><input style={inp} value={taskForm.title} onChange={e=>setTaskForm({...taskForm,title:e.target.value})} placeholder="What needs to be done?"/></div>
-          <div style={{marginBottom:10}}><label style={lbl}>Description</label><textarea style={{...inp,height:70,resize:"vertical"}} value={taskForm.description} onChange={e=>setTaskForm({...taskForm,description:e.target.value})} placeholder="Details, context, expected outcome..."/></div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-            <div><label style={lbl}>Priority</label><select style={inp} value={taskForm.priority} onChange={e=>setTaskForm({...taskForm,priority:e.target.value})}>{["low","normal","high","critical"].map(p=><option key={p} value={p}>{p.toUpperCase()}</option>)}</select></div>
-            <div><label style={lbl}>Due Date</label><input type="date" style={inp} value={taskForm.due_date} onChange={e=>setTaskForm({...taskForm,due_date:e.target.value})}/></div>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-            <div><label style={lbl}>Assign To</label><select style={inp} value={taskForm.assigned_to} onChange={e=>{const uid=e.target.value;const u=users.find(x=>x.id===uid);setTaskForm({...taskForm,assigned_to:uid,assigned_to_name:u?(u.full_name||u.username):"All"})}}><option value="">— All (Everyone) —</option>{users.filter(u=>u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name||u.username}</option>)}</select></div>
-            <div><label style={lbl}>Linked Account</label><select style={inp} value={taskForm.account_id} onChange={e=>setTaskForm({...taskForm,account_id:e.target.value})}><option value="">— None —</option>{scopedAccs.map(a=><option key={a.id} value={a.id}>{a.client}</option>)}</select></div>
-          </div>
-          <div style={{marginBottom:14}}><label style={lbl}>Tags (comma-separated)</label><input style={inp} value={taskForm.tags} onChange={e=>setTaskForm({...taskForm,tags:e.target.value})} placeholder="site-visit, urgent, vendor..."/></div>
-          <div style={{display:"flex",gap:8}}><button style={bt("p")} onClick={saveTask} disabled={syncing}>{syncing?"SAVING...":editTask?"UPDATE":"CREATE"}</button><button style={bt("g")} onClick={()=>{setShowTaskForm(false);setEditTask(null)}}>CANCEL</button></div>
-        </div>
-      </div>}
-
-      <J3S/>
-    </div>;
-  };
-
   // ═══ MAIN RENDER ═══
   return<div style={{background:C.bg,minHeight:"100vh",fontFamily:F,color:C.t}}>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
@@ -1332,58 +1258,43 @@ const createUser = async () => {
         })}
         <span style={{background:C.gn,color:C.bg,padding:"2px 8px",fontSize:9,fontWeight:700,borderRadius:2}}>LIVE</span>
         <div style={{display:"flex",alignItems:"center",gap:6,marginLeft:6,padding:"4px 10px",background:"#1a2418",border:`1px solid ${C.bd}`,fontSize:10}}>
-          <span style={dot(C.gn)}/><span style={{color:C.t}}>{user.full_name||user.username}</span><span style={pill(isA?C.g:C.bl)}>{user.role.toUpperCase()}</span>
+          <span style={dot(C.gn)}/><span style={{color:C.t}}>{user.full_name||user.username}</span><span style={pill(isSA?"#a855f7":isA?C.g:C.bl)}>{user.role.toUpperCase()}</span>
           <span style={{color:C.rd,cursor:"pointer",fontWeight:700,marginLeft:4}} onClick={()=>{setUser(null);setLoaded(false);setAccs([]);setNotifs([]);setView("dashboard")}}>✕</span>
         </div>
       </div>
     </div>
     <div style={{padding:"18px 20px"}}>
-     {view==="dashboard"&&Dash()}
-{view==="tasks"&&Tasks()}
-{view==="command"&&<CommandPanels accs={scopedAccs} users={users} currentUser={user} isAdmin={isA} stg={stg} loadAll={loadAll} onNotifChange={loadNotifs}/>}
-{view==="detail"&&Det()}
-{view==="analytics"&&Analytics()}
-{view==="notifications"&&Notif()}
-{view==="users"&&isSA&&Usr()}
-{view==="settings"&&isSA&&Stg()}
+      {view==="dashboard"&&<Dash/>}
+      {view==="tasks"&&<Tasks/>}
+      {view==="command"&&<CommandPanels accs={scopedAccs} users={users} currentUser={user} isAdmin={isA} stg={stg} loadAll={loadAll} onNotifChange={loadNotifs}/>}
+      {view==="detail"&&<Det/>}
+      {view==="analytics"&&<Analytics/>}
+      {view==="notifications"&&<Notif/>}
+      {view==="users"&&isSA&&<Usr/>}
+      {view==="settings"&&isSA&&<Stg/>}
     </div>
-    {showFrm&&Frm()}
-    {pwModal.open&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>{setPwModal({open:false,user:null});setPwVal("");setPwVal2("");setPwErr("")}}>
-      <div style={{background:C.dk,border:`2px solid ${C.bl}`,padding:24,width:360,fontFamily:F}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontSize:11,color:C.bl,letterSpacing:2,marginBottom:14,paddingBottom:8,borderBottom:`1px solid ${C.bd}`,fontWeight:700}}>🔑 RESET PASSWORD</div>
-        <div style={{fontSize:11,color:C.m,marginBottom:14}}>User: <span style={{color:C.t,fontWeight:700}}>{pwModal.user?.full_name||pwModal.user?.username}</span></div>
-        <div style={{marginBottom:10}}><label style={lbl}>New Password *</label><input style={inp} type="password" value={pwVal} onChange={e=>setPwVal(e.target.value)} placeholder="Enter new password" autoFocus/></div>
-        <div style={{marginBottom:10}}><label style={lbl}>Confirm Password *</label><input style={inp} type="password" value={pwVal2} onChange={e=>setPwVal2(e.target.value)} placeholder="Confirm new password"/></div>
-        {pwErr&&<div style={{color:C.rd,fontSize:11,marginBottom:10}}>{pwErr}</div>}
-        <div style={{display:"flex",gap:8,marginTop:14}}>
-          <button style={bt("p")} onClick={async()=>{
-            if(!pwVal.trim()){setPwErr("Password required");return}
-            if(pwVal!==pwVal2){setPwErr("Passwords do not match");return}
-            if(pwVal.length<6){setPwErr("Minimum 6 characters");return}
-            setPwErr("");
-            const ok=await resetUserPassword(pwModal.user.id,pwVal);
-            if(ok){tw("Password reset");setPwModal({open:false,user:null});setPwVal("");setPwVal2("")}
-            else setPwErr("Reset failed — check connection");
-          }}>CONFIRM</button>
-          <button style={bt("g")} onClick={()=>{setPwModal({open:false,user:null});setPwVal("");setPwVal2("");setPwErr("")}}>CANCEL</button>
-        </div>
-      </div>
-    </div>}
-    {delUserModal.open&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setDelUserModal({open:false,user:null})}>
-      <div style={{background:C.dk,border:`2px solid ${C.rd}`,padding:24,width:380,fontFamily:F}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontSize:11,color:C.rd,letterSpacing:2,marginBottom:14,paddingBottom:8,borderBottom:`1px solid ${C.bd}`,fontWeight:700}}>⚠ DELETE USER — PERMANENT</div>
-        <div style={{fontSize:12,color:C.t,marginBottom:6}}>Permanently delete <span style={{color:C.rd,fontWeight:700}}>{delUserModal.user?.full_name||delUserModal.user?.username}</span>?</div>
-        <div style={{fontSize:11,color:C.m,marginBottom:18,lineHeight:1.5}}>This cannot be undone. All their task assignments will be unlinked, account field officer assignments will be cleared, and their notifications will be deleted.</div>
-        <div style={{display:"flex",gap:8}}>
-          <button style={bt("d")} onClick={async()=>{
-            const ok=await hardDeleteUser(delUserModal.user.id);
-            if(ok){setDelUserModal({open:false,user:null});tw("User deleted")}
-            else tw("Delete failed");
-          }}>CONFIRM DELETE</button>
-          <button style={bt("g")} onClick={()=>setDelUserModal({open:false,user:null})}>CANCEL</button>
-        </div>
-      </div>
-    </div>}
+
+    {/* ALL MODALS — rendered outside page content so they never get remounted by view changes */}
+    {showFrm&&<AccountFormModal fd={fd} setFD={setFD} eMode={eMode} onSave={saveAcc} onClose={()=>{setSF(false);setEM(false)}} syncing={syncing} stg={stg} users={users}/>}
+    {showUF&&<CreateUserModal uf={uf} setUF={setUF} onSave={createUser} onClose={()=>setSUF(false)} stg={stg}/>}
+    {showTaskForm&&<TaskFormModal editTask={editTask} taskForm={taskForm} setTaskForm={setTaskForm} onSave={saveTask} onClose={()=>{setShowTaskForm(false);setEditTask(null)}} syncing={syncing} users={users} scopedAccs={scopedAccs}/>}
+    {pwModal.open&&<PwResetModal pwModal={pwModal} pwVal={pwVal} setPwVal={setPwVal} pwVal2={pwVal2} setPwVal2={setPwVal2} pwErr={pwErr} setPwErr={setPwErr}
+      onConfirm={async()=>{
+        if(!pwVal.trim()){setPwErr("Password required");return}
+        if(pwVal!==pwVal2){setPwErr("Passwords do not match");return}
+        if(pwVal.length<6){setPwErr("Minimum 6 characters");return}
+        setPwErr("");
+        const ok=await resetUserPassword(pwModal.user.id,pwVal);
+        if(ok){tw("Password reset");setPwModal({open:false,user:null});setPwVal("");setPwVal2("")}
+        else setPwErr("Reset failed — check connection");
+      }}
+      onClose={()=>{setPwModal({open:false,user:null});setPwVal("");setPwVal2("");setPwErr("")}}
+    />}
+    {delUserModal.open&&<DelUserModal delUserModal={delUserModal}
+      onConfirm={async()=>{const ok=await hardDeleteUser(delUserModal.user.id);if(ok){setDelUserModal({open:false,user:null});tw("User deleted")}else tw("Delete failed")}}
+      onClose={()=>setDelUserModal({open:false,user:null})}
+    />}
+
     {toast&&<div style={{position:"fixed",bottom:20,right:20,background:C.g,color:C.bg,padding:"8px 18px",fontSize:12,fontWeight:700,letterSpacing:1,fontFamily:F,zIndex:300,borderRadius:2}}>{toast}</div>}
   </div>;
 }
