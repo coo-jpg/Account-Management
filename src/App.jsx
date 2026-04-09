@@ -71,8 +71,17 @@ const sb = v => ({...bt(v),padding:"4px 10px",fontSize:10});
 const th = {background:"#1a2418",color:C.g,padding:"8px 10px",textAlign:"left",fontSize:10,letterSpacing:2,textTransform:"uppercase",borderBottom:`2px solid ${C.bd}`,whiteSpace:"nowrap"};
 const td = {padding:"8px 10px",borderBottom:`1px solid #1a2418`,verticalAlign:"middle",fontSize:12};
 const dr = {display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:`1px solid ${C.bg}`};
+const logoWrap = {width:72,height:72,border:`1px solid ${C.bd}`,background:"#0d140b",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0};
+const logoImg = {width:"100%",height:"100%",objectFit:"contain"};
+const logoFallback = {color:C.g,fontWeight:700,letterSpacing:2,fontSize:11};
 
 const J3S = () => <div style={{textAlign:"center",padding:"14px 0",borderTop:`1px solid ${C.bd}`,marginTop:24,fontSize:10,letterSpacing:3,color:C.d}}>BUILT FOR THE <span style={{color:C.g,fontWeight:700}}>J3S OFFICE</span></div>;
+const BrandLogo = ({size=72}) => {
+  const [err,setErr] = useState(false);
+  return <div style={{...logoWrap,width:size,height:size}}>
+    {!err ? <img src="/logo.png" alt="Black Belt Commandos logo" style={logoImg} onError={()=>setErr(true)}/> : <span style={logoFallback}>BBCSS</span>}
+  </div>;
+};
 
 function PayIn({onRec}){const[a,setA]=useState(""),[r,setR]=useState(""),[n,setN]=useState("");return<div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}><input style={{...inp,flex:1,minWidth:80}} placeholder="Amount" value={a} onChange={e=>setA(e.target.value)} type="number"/><input style={{...inp,width:100}} placeholder="Ref" value={r} onChange={e=>setR(e.target.value)}/><input style={{...inp,width:100}} placeholder="Note" value={n} onChange={e=>setN(e.target.value)}/><button style={bt("p")} onClick={()=>{if(a>0){onRec(Number(a),r,n);setA("");setR("");setN("")}}}>RECORD</button></div>}
 
@@ -355,7 +364,8 @@ export default function App(){
     <div style={{background:C.bg,minHeight:"100vh",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column"}}>
       <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}} @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}`}</style>
-      <div style={{border:`2px solid ${C.g}`,background:C.dk,padding:40,width:340,textAlign:"center",animation:"fadeIn .4s ease-out"}}>
+      <div style={{border:`2px solid ${C.g}`,background:C.dk,padding:32,width:360,textAlign:"center",animation:"fadeIn .4s ease-out"}}>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:14}}><BrandLogo size={86}/></div>
         <div style={{fontSize:24,fontWeight:700,color:C.g,letterSpacing:6,marginBottom:4}}>BBCSS</div>
         <div style={{fontSize:9,color:C.m,letterSpacing:3,marginBottom:6}}>ACCOUNT MANAGEMENT SYSTEM</div>
         <div style={{fontSize:9,color:C.d,letterSpacing:2,marginBottom:30}}>BUILT FOR THE <span style={{color:C.g}}>J3S OFFICE</span></div>
@@ -1284,7 +1294,10 @@ export default function App(){
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
     <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}} @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}} *::-webkit-scrollbar{width:5px;height:5px} *::-webkit-scrollbar-track{background:${C.bg}} *::-webkit-scrollbar-thumb{background:${C.bd};border-radius:3px} *::-webkit-scrollbar-thumb:hover{background:${C.g}} input[type=color]{padding:2px;height:32px;cursor:pointer}`}</style>
     <div style={{background:"linear-gradient(180deg,#1a2418 0%,#0f1a0d 100%)",borderBottom:`2px solid ${C.g}`,padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100,flexWrap:"wrap",gap:6}}>
-      <div><div style={{fontSize:16,fontWeight:700,color:C.g,letterSpacing:3}}>{stg.companyName} ACCOUNTS</div><div style={{fontSize:9,color:C.d,letterSpacing:2}}>BUILT FOR THE <span style={{color:C.g}}>J3S OFFICE</span></div></div>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <BrandLogo size={44}/>
+        <div><div style={{fontSize:16,fontWeight:700,color:C.g,letterSpacing:3}}>{stg.companyName} ACCOUNTS</div><div style={{fontSize:9,color:C.d,letterSpacing:2}}>BUILT FOR THE <span style={{color:C.g}}>J3S OFFICE</span></div></div>
+      </div>
       <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
         {syncing&&<span style={{fontSize:10,color:C.yl,animation:"pulse 1s infinite"}}>SYNCING</span>}
         {[["dashboard","DASHBOARD"],["tasks","📋 TASKS"],["command","COMMAND"],["analytics","ANALYTICS"],["notifications",`🔔 NOTIFICATIONS${unreadNotifCount>0?` (${unreadNotifCount})`:""}`],...(isSA?[["users","👤 USERS"],["settings","⚙ SETTINGS"]]:[])].filter(([k])=>["users","settings"].includes(k)?isSA:k==="tasks"?true:canSee(k)).map(([k,l])=>{
