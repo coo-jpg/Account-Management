@@ -46,7 +46,7 @@ const DS = {
   invoiceDayDefault:1,defaultPaymentTerms:30,defaultBillingCycle:"Monthly",defaultHealth:"Green",defaultStatus:"Active",
   customFields:[],notesTemplate:"",showBranding:true,
   renewalStatuses:["Pending","In Discussion","Rate Revision","Renewed","Lost"],
-  branches:["Hyderabad","Bangalore"],
+  branches:["Karnataka","Telangana","Tamil Nadu","Kerala","Multi-State"],
 };
 
 // ═══ UTILS ═══
