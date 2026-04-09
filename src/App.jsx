@@ -230,14 +230,24 @@ export default function App(){
   const upDoc=async(uid,f)=>{if(f.size>5e6){tw("Max 5MB");return}setSyncing(true);const p=`${uid}/${Date.now()}_${f.name}`;const ok=await upFile(p,f);if(ok){await post("account_documents",{account_id:uid,file_name:f.name,file_type:f.type,file_size:f.size,storage_path:p});await loadAll();tw("Uploaded")}else tw("Failed");setSyncing(false)};
   const rmDoc=async(did,sp)=>{setSyncing(true);await rmFile(sp);await rm("account_documents",`?id=eq.${did}`);await loadAll();setSyncing(false);tw("Removed")};
 
-  // ─── USER MGMT via RPC ───
-  const createUser = async () => {
+const createUser = async () => {
   try {
     if (!uf.username || !uf.password) {
       tw("Username & password required");
       return;
     }
 
+    const res = await rpc("acm_create_user", {
+      p_username: uf.username,
+      p_password: uf.password,
+      p_full_name: uf.full_name,
+      p_role: uf.role,
+      p_scope_level: uf.scope_level,
+      p_scope_branch: uf.scope_branch,
+      p_view_permissions: uf.view_permissions
+    });
+
+    if (res && res.length > 0) {
 
     if (res && res.length > 0) {
       await loadUsers();
