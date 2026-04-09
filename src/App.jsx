@@ -600,7 +600,7 @@ const createUser = async () => {
 
   // ═══ FORM ═══
   const Frm=()=>{if(!fd)return null;return<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:200,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:20,overflowY:"auto"}} onClick={()=>setSF(false)}>
-    <div style={{background:C.dk,border:`2px solid ${C.g}`,width:"94%",maxWidth:720,padding:22,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+    <div key={fd?.id||"new-account"} style={{background:C.dk,border:`2px solid ${C.g}`,width:"94%",maxWidth:720,padding:22,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
       <div style={{fontSize:14,fontWeight:700,color:C.g,letterSpacing:2,marginBottom:14}}>{eMode?"EDIT":"NEW"} ACCOUNT</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
         <div><label style={lbl}>Client</label><input style={inp} value={fd.client} onChange={e=>setFD({...fd,client:e.target.value})}/></div>
