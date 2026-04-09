@@ -96,6 +96,11 @@ export default function App(){
   const[toast,setToast]=useState(null);
   const[users,setUsers]=useState([]);
   const[showUF,setSUF]=useState(false);
+  const[pwModal,setPwModal]=useState({open:false,user:null});
+const[pwVal,setPwVal]=useState("");
+const[pwVal2,setPwVal2]=useState("");
+const[pwErr,setPwErr]=useState("");
+const[delUserModal,setDelUserModal]=useState({open:false,user:null});
   const[uf,setUF]=useState({username:"",password:"",full_name:"",role:"user",scope_level:"org",scope_branch:"",view_permissions:{dashboard:true,command:true,analytics:true,notifications:true}});
   const[notifs,setNotifs]=useState([]);
   const[notifTick,setNotifTick]=useState(0);
@@ -467,7 +472,7 @@ export default function App(){
           <td style={td}>{u.role==="admin"?<span style={{color:C.d,fontSize:10}}>ALL (admin)</span>:<div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{[["dashboard","DASH"],["command","CMD"],["analytics","ANL"],["notifications","NOTIF"]].map(([k,l])=><label key={k} style={{display:"flex",alignItems:"center",gap:3,fontSize:9,cursor:isSelf?"default":"pointer",color:vp[k]?C.gn:C.d}}><input type="checkbox" checked={vp[k]!==false} disabled={isSelf} onChange={()=>vpToggle(u,k)} style={{margin:0,cursor:isSelf?"default":"pointer"}}/>{l}</label>)}</div>}</td>
           <td style={td}><span style={dot(u.is_active?C.gn:C.rd)}/>{u.is_active?"Active":"Off"}</td>
           <td style={{...td,fontSize:11,color:C.m}}>{u.last_login?$d(u.last_login):"Never"}</td>
-          <td style={td}>{!isSelf&&<div style={{display:"flex",gap:6}}><button style={sb(u.is_active?"d":"s")} onClick={()=>toggleUser(u.id,u.is_active)}>{u.is_active?"DISABLE":"ENABLE"}</button><select style={{...inp,width:80,padding:"2px 6px",fontSize:10}} value={u.role} onChange={e=>changeRole(u.id,e.target.value)}><option value="admin">Admin</option><option value="user">User</option></select></div>}</td>
+          <td style={td}>{!isSelf&&<div style={{display:"flex",gap:6,flexWrap:"wrap"}}> {isS&&<button style={{...sb("s"),color:C.bl,border:`1px solid ${C.bl}44`}} onClick={()=>setPwModal({open:true,user:u})}>🔑 RESET PW</button>} {isS&&<button style={sb("d")} onClick={()=>setDelUserModal({open:true,user:u})}>🗑 DELETE</button>}<button style={sb(u.is_active?"d":"s")} onClick={()=>toggleUser(u.id,u.is_active)}>{u.is_active?"DISABLE":"ENABLE"}</button><select style={{...inp,width:80,padding:"2px 6px",fontSize:10}} value={u.role} onChange={e=>changeRole(u.id,e.target.value)}><option value="admin">Admin</option><option value="user">User</option></select></div>}</td>
         </tr>})}
     </tbody></table></div>
     {showUF&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setSUF(false)}>
@@ -1290,6 +1295,43 @@ export default function App(){
 {view==="settings"&&isA&&Stg()}
     </div>
     {showFrm&&Frm()}
+    {pwModal.open&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>{setPwModal({open:false,user:null});setPwVal("");setPwVal2("");setPwErr("")}}>
+  <div style={{background:C.dk,border:`2px solid ${C.bl}`,padding:24,width:360,borderRadius:8,fontFamily:F}} onClick={e=>e.stopPropagation()}>
+    <div style={{fontSize:11,color:C.bl,letterSpacing:2,marginBottom:14,paddingBottom:8,borderBottom:`1px solid ${C.border}`}}>🔑 RESET PASSWORD</div>
+    <div style={{fontSize:11,color:C.m,marginBottom:14}}>User: <span style={{color:C.t,fontWeight:700}}>{pwModal.user?.full_name||pwModal.user?.username}</span></div>
+    <div style={{marginBottom:10}}><div style={{fontSize:10,color:C.m,letterSpacing:1,marginBottom:4}}>NEW PASSWORD *</div><input style={{...inp,marginBottom:0}} type="password" value={pwVal} onChange={e=>setPwVal(e.target.value)} placeholder="Enter new password" autoFocus/></div>
+    <div style={{marginBottom:10}}><div style={{fontSize:10,color:C.m,letterSpacing:1,marginBottom:4}}>CONFIRM PASSWORD *</div><input style={{...inp,marginBottom:0}} type="password" value={pwVal2} onChange={e=>setPwVal2(e.target.value)} placeholder="Confirm new password"/></div>
+    {pwErr&&<div style={{color:C.rd,fontSize:11,marginBottom:10}}>{pwErr}</div>}
+    <div style={{display:"flex",gap:8,marginTop:14}}>
+      <button style={bt("p")} onClick={async()=>{
+        if(!pwVal.trim()){setPwErr("Password required");return}
+        if(pwVal!==pwVal2){setPwErr("Passwords do not match");return}
+        if(pwVal.length<6){setPwErr("Min 6 characters");return}
+        setPwErr("");
+        const r=await rpc("acm_reset_password",{p_user_id:pwModal.user.id,p_new_password:pwVal});
+        if(r){tw("Password reset successfully");setPwModal({open:false,user:null});setPwVal("");setPwVal2("")}
+        else tw("Reset failed");
+      }}>CONFIRM RESET</button>
+      <button style={bt("g")} onClick={()=>{setPwModal({open:false,user:null});setPwVal("");setPwVal2("");setPwErr("")}}>CANCEL</button>
+    </div>
+  </div>
+</div>}
+
+{delUserModal.open&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setDelUserModal({open:false,user:null})}>
+  <div style={{background:C.dk,border:`2px solid ${C.rd}`,padding:24,width:360,borderRadius:8,fontFamily:F}} onClick={e=>e.stopPropagation()}>
+    <div style={{fontSize:11,color:C.rd,letterSpacing:2,marginBottom:14,paddingBottom:8,borderBottom:`1px solid ${C.border}`}}>⚠ DELETE USER</div>
+    <div style={{fontSize:12,color:C.t,marginBottom:6}}>Permanently delete <span style={{color:C.rd,fontWeight:700}}>{delUserModal.user?.full_name||delUserModal.user?.username}</span>?</div>
+    <div style={{fontSize:11,color:C.m,marginBottom:18}}>This cannot be undone. All their task assignments and notifications will be unlinked.</div>
+    <div style={{display:"flex",gap:8}}>
+      <button style={bt("d")} onClick={async()=>{
+        const r=await rpc("acm_delete_user",{p_user_id:delUserModal.user.id});
+        if(r){await loadUsers();setDelUserModal({open:false,user:null});tw("User deleted")}
+        else tw("Delete failed");
+      }}>CONFIRM DELETE</button>
+      <button style={bt("g")} onClick={()=>setDelUserModal({open:false,user:null})}>CANCEL</button>
+    </div>
+  </div>
+</div>}
     {toast&&<div style={{position:"fixed",bottom:20,right:20,background:C.g,color:C.bg,padding:"8px 18px",fontSize:12,fontWeight:700,letterSpacing:1,fontFamily:F,zIndex:300,borderRadius:2}}>{toast}</div>}
   </div>;
 }
