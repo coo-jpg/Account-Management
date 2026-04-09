@@ -238,15 +238,6 @@ export default function App(){
       return;
     }
 
-    const res = await rpc("acm_create_user", {
-      p_username: uf.username,
-      p_password: uf.password,
-      p_full_name: uf.full_name,
-      p_role: uf.role,
-      p_scope_level: uf.scope_level,
-      p_scope_branch: uf.scope_branch || null,
-      p_view_permissions: uf.view_permissions
-    });
 
     if (res && res.length > 0) {
       await loadUsers();
