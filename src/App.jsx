@@ -5,8 +5,20 @@ const SB = "https://iqccddabidfcrsbdehiq.supabase.co";
 const SK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlxY2NkZGFiaWRmY3JzYmRlaGlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwODQyMDQsImV4cCI6MjA4NzY2MDIwNH0.tKb-l9TnlSDVsG7zHUJTdd5kt5vWCYKtvQYwVjz0xos";
 const H = { apikey: SK, Authorization: `Bearer ${SK}`, "Content-Type": "application/json" };
 const rpc = async (fn, params) => {
-  const r = await fetch(`${SB}/rest/v1/rpc/${fn}`, { method: "POST", headers: H, body: JSON.stringify(params) });
-  return r.ok ? r.json() : null;
+  const r = await fetch(`${SB}/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    headers: H,
+    body: JSON.stringify(params)
+  });
+
+  const data = await r.json().catch(() => null);
+
+  if (!r.ok) {
+    console.error("RPC ERROR:", data);
+    throw new Error(data?.message || "RPC failed");
+  }
+
+  return data;
 };
 const get = async (t, p = "") => { try { const r = await fetch(`${SB}/rest/v1/${t}${p}`, { headers: { ...H, Prefer: "return=representation" } }); return r.ok ? r.json() : [] } catch { return [] } };
 const post = async (t, d) => { try { const r = await fetch(`${SB}/rest/v1/${t}`, { method: "POST", headers: { ...H, Prefer: "return=representation" }, body: JSON.stringify(d) }); return r.ok ? r.json() : null } catch { return null } };
