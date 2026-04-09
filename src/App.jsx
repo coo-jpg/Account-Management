@@ -529,7 +529,7 @@ const createUser = async () => {
         </tr>})}
     </tbody></table></div>
     {showUF&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setSUF(false)}>
-      <div style={{background:C.dk,border:`2px solid ${C.g}`,padding:24,width:400,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <div key="create-user-modal" style={{background:C.dk,border:`2px solid ${C.g}`,padding:24,width:400,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
         <div style={{fontSize:14,fontWeight:700,color:C.g,letterSpacing:2,marginBottom:16}}>CREATE USER</div>
         <div style={{marginBottom:10}}><label style={lbl}>Username</label><input style={inp} value={uf.username} onChange={e=>setUF({...uf,username:e.target.value})}/></div>
         <div style={{marginBottom:10}}><label style={lbl}>Password</label><input style={inp} type="password" value={uf.password} onChange={e=>setUF({...uf,password:e.target.value})}/></div>
