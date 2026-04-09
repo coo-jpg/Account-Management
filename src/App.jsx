@@ -231,51 +231,47 @@ export default function App(){
   const rmDoc=async(did,sp)=>{setSyncing(true);await rmFile(sp);await rm("account_documents",`?id=eq.${did}`);await loadAll();setSyncing(false);tw("Removed")};
 
 const createUser = async () => {
-  try {
-    if (!uf.username || !uf.password) {
-      tw("Username & password required");
-      return;
-    }
-
-    const res = await rpc("acm_create_user", {
-      p_username: uf.username,
-      p_password: uf.password,
-      p_full_name: uf.full_name,
-      p_role: uf.role,
-      p_scope_level: uf.scope_level,
-      p_scope_branch: uf.scope_branch,
-      p_view_permissions: uf.view_permissions
-    });
-
-    if (res && res.length > 0) {
-
-    if (res && res.length > 0) {
-      await loadUsers();
-      setSUF(false); // closes modal ONLY on success
-      setUF({
-        username: "",
-        password: "",
-        full_name: "",
-        role: "user",
-        scope_level: "org",
-        scope_branch: "",
-        view_permissions: {
-          dashboard: true,
-          command: true,
-          analytics: true,
-          notifications: true
-        }
+    try {
+      if (!uf.username || !uf.password) {
+        tw("Username & password required");
+        return;
+      }
+      const res = await rpc("acm_create_user", {
+        p_username: uf.username,
+        p_password: uf.password,
+        p_full_name: uf.full_name,
+        p_role: uf.role,
+        p_state: "HQ",
+        p_scope_level: uf.scope_level,
+        p_scope_branch: uf.scope_branch,
+        p_view_permissions: uf.view_permissions
       });
-      tw("User created");
-    } else {
-      tw("Creation failed");
+      if (res && res.length > 0) {
+        await loadUsers();
+        setSUF(false);
+        setUF({
+          username: "",
+          password: "",
+          full_name: "",
+          role: "user",
+          scope_level: "org",
+          scope_branch: "",
+          view_permissions: {
+            dashboard: true,
+            command: true,
+            analytics: true,
+            notifications: true
+          }
+        });
+        tw("User created");
+      } else {
+        tw("Creation failed — username may already exist");
+      }
+    } catch (err) {
+      console.error(err);
+      tw(err.message || "Error creating user");
     }
-
-  } catch (err) {
-    console.error(err);
-    tw(err.message || "Error creating user");
-  }
-};
+  };
   const toggleUser=async(id,active)=>{await patch("acm_users",`?id=eq.${id}`,{is_active:!active});await loadUsers();tw(active?"Deactivated":"Activated")};
   const changeRole=async(id,role)=>{await patch("acm_users",`?id=eq.${id}`,{role});await loadUsers();tw("Role updated")};
   const updateUserField=async(id,data)=>{await patch("acm_users",`?id=eq.${id}`,data);await loadUsers();tw("Updated")};
